@@ -210,9 +210,9 @@ std.diff1 <-apply(cov1,2,function(x) 100*(mean(x[treated1])- mean(x[!treated1]))
 
   
 # Organizes standardized differences for easy analysis and visualization
-posmatchingIndexData<- data.frame(abs(std.diff1)) %>% set_names("Desequilibrio") %>% tibble::rownames_to_column(var="Variable") %>%  arrange(Desequilibrio)
-posmatchingIndexDataV2<- posmatchingIndexData  %>%  arrange(desc(Desequilibrio)) %>%
-  mutate(Desequilibrio= ifelse(Desequilibrio>=100,100,Desequilibrio)) %>% 
+posmatchingIndexData<- data.frame(abs(std.diff1)) %>% set_names("imbalance") %>% tibble::rownames_to_column(var="Variable") %>%  arrange(imbalance)
+posmatchingIndexDataV2<- posmatchingIndexData  %>%  arrange(desc(imbalance)) %>%
+  mutate(imbalance= ifelse(imbalance>=100,100,imbalance)) %>% 
   mutate(Variable= factor(Variable, levels = unique(.$Variable)), label= paste0(paste(paste(rep("   ",3), collapse = ""), collapse = ""), Variable, sep=""))
 
 # Estimate percent balance improvement. Organize the standardized differences before and after matching data.
@@ -229,7 +229,7 @@ color_vline_unbalanced_vars_posmatch<- "red"
 pos_vline_unbalanced_vars_posmatch<- 25
 
 gg_summ_Imbalancedata<- ggplot(data= summ_Imbalancedata)+  
-  geom_point(aes(x=Desequilibrio, y= Variable, color= Match), size= 1) +
+  geom_point(aes(x=imbalance, y= Variable, color= Match), size= 1) +
   labs(x= y_axis_title_unbalanced_vars_posmatch, y= x_axis_title_unbalanced_vars_posmatch)+
   geom_vline(aes(xintercept= pos_vline_unbalanced_vars_posmatch),  size= 0.5, linetype="dashed", color = color_vline_unbalanced_vars_posmatch)+
   theme(
@@ -443,12 +443,9 @@ summary_forest<- data.frame(fd= c("treatment", "control_pre", "control_pos"),
     dplyr::mutate(sign_deforest_2000_2021= sapply(.$zval_deforest_2000_2021, function(x) {
       if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"}  else {""} } )  )
   
-  
-    
-    
 
 # Plotting forest estimations
-
+# Define the colors and labels for the plotting
 guide_fill_forest<- list(
   data.frame(fd= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
   data.frame(fd= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
@@ -461,12 +458,10 @@ guide_xaxis_forest <- list(
   data.frame(fd= "treatment", label_x = "Treatment" )
 ) %>% rbind.fill()
 
-
 y_axis_title_result_forest<- "Forest loss (%)"
 x_axis_title_result_forest<- type_gov
 legend_title_result_forest<- ""
 plot_title_result_forest<- paste("Forests", type_gov)
-
 
 dataplot_forest<- summary_forest %>%
   dplyr::mutate(fd= factor( fd, levels = unique(.$fd) )) %>% 
@@ -476,12 +471,11 @@ dataplot_forest<- summary_forest %>%
     label_x= factor(label_x, levels= unique(guide_xaxis_forest$label_x))
   )
 
-
+# plot the proportion of forest loss 
 plot_forest<- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss , fill= label_fill))+
   geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
   geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
                 width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-  # geom_signif(position="identity",  textsize = 5, comparisons=list(c("Control posMatching","Treatment")) , annotations = dataplot_forest$sign_forest_2005_2021[1])+
   xlab(x_axis_title_result_forest)+ylab(y_axis_title_result_forest)+
   scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
   scale_fill_manual(legend_title_result_forest,  values = setNames(guide_fill_forest$color_fill ,guide_fill_forest$label_fill) )+
@@ -491,7 +485,7 @@ plot_forest<- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss
         axis.line.y = element_line(color = "black"),
         axis.line.x = element_line(color = "black"))
 
-
+# plot the proportion of forest loss  with significance annotations
 plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss , fill= label_fill))+
   geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
   geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
@@ -517,117 +511,118 @@ plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_pro
     
                   
   
-  ########### Carbon effect
-  # control_pre matching
+########### Carbon effect
+
+# Pre-matching control
+control_pre_carbon_2000 = dplyr::filter(Control, Fores_2000 == 1)$Carbon_pixel
+control_pre_carbon_2021 = dplyr::filter(Control, Fores_2021 == 1)$Carbon_pixel
   
-  control_pre_carbon_2000 = dplyr::filter(Control, Fores_2000 == 1)$Carbon_pixel
-  control_pre_carbon_2021 = dplyr::filter(Control, Fores_2021 == 1)$Carbon_pixel
+# Identify carbon pixel data associated with deforestation from 2000 to 2021 from original data
+loss_pre_carbon<- dplyr::filter(Control, Fores_2000 == 1 & Fores_2021 == 0 )$Carbon_pixel
   
-  loss_pre_carbon<- dplyr::filter(Control, Fores_2000 == 1 & Fores_2021 == 0 )$Carbon_pixel
-  
-  mean_pre_carbon<- mean(loss_pre_carbon)
-  sum_pre_carbon<- sum(loss_pre_carbon)
-  
-  
-  sum_control_pre_carbon_2000<- sum(control_pre_carbon_2000, na.rm=T)
-  sum_control_pre_carbon_2021<- sum(control_pre_carbon_2021, na.rm=T)
-  
-  mean_control_pre_carbon_2000<- mean(control_pre_carbon_2000, na.rm=T)
-  mean_control_pre_carbon_2021<- mean(control_pre_carbon_2021, na.rm=T)
-  
-  Prop_noloss_carbon_control_pre<- (sum_control_pre_carbon_2021/sum_control_pre_carbon_2000)*100
-  Prop_carbon_control_pre<- 100-Prop_noloss_carbon_control_pre
+# Calculate metrics about carbon in deforestation pixels.
+mean_pre_carbon<- mean(loss_pre_carbon)
+sum_pre_carbon<- sum(loss_pre_carbon)
+
+sum_control_pre_carbon_2000<- sum(control_pre_carbon_2000, na.rm=T)
+sum_control_pre_carbon_2021<- sum(control_pre_carbon_2021, na.rm=T)
+
+mean_control_pre_carbon_2000<- mean(control_pre_carbon_2000, na.rm=T)
+mean_control_pre_carbon_2021<- mean(control_pre_carbon_2021, na.rm=T)
   
   
-  binomial_test_losscarb_control_pre<- 100* (1 - DescTools::BinomCI(x= sum_control_pre_carbon_2021, n= sum(control_pre_carbon_2000, na.rm=T), 
+# Calculate the proportion of carbon retained and lost in pixels with forests before matching.
+Prop_noloss_carbon_control_pre<- (sum_control_pre_carbon_2021/sum_control_pre_carbon_2000)*100
+Prop_carbon_control_pre<- 100-Prop_noloss_carbon_control_pre
+  
+# Estimate confidence intervals for carbon loss proportion in the control group pre-matching.
+binomial_test_losscarb_control_pre<- 100* (1 - DescTools::BinomCI(x= sum_control_pre_carbon_2021, n= sum(control_pre_carbon_2000, na.rm=T), 
                                                            conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
-  
- lower_losscarb_control_pre<- min(binomial_test_losscarb_control_pre[c("lwr.ci", "upr.ci")])
- upper_losscarb_control_pre<- max(binomial_test_losscarb_control_pre[c("lwr.ci", "upr.ci")])
-  
-  
-  
-  
-  
-  
-  dispersion_pre_carbon_effect <- list(t1= control_pre_carbon_2000, t2= control_pre_carbon_2021, loss= loss_pre_carbon) %>% 
+
+lower_losscarb_control_pre<- min(binomial_test_losscarb_control_pre[c("lwr.ci", "upr.ci")])
+upper_losscarb_control_pre<- max(binomial_test_losscarb_control_pre[c("lwr.ci", "upr.ci")])
+
+# Organize data
+dispersion_pre_carbon_effect <- list(t1= control_pre_carbon_2000, t2= control_pre_carbon_2021, loss= loss_pre_carbon) %>% 
     {lapply(names(.), function(x) data.frame(level= x, value= .[[x]]))} %>% rbind.fill() %>% 
     dplyr::mutate(level= factor(level, levels= c("t1", "t2", "loss")), treatment= "control_pre")
   
   
-  
-  # control_pos matching
+
+##  Pos-matching control
   control_pos_carbon_2000 = dplyr::filter(matched.cases_forest, forest_yC2000 == 1)$carbon_yC
   control_pos_carbon_2021 = dplyr::filter(matched.cases_forest, forest_yC2021 == 1)$carbon_yC
-  
-  loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & forest_yC2021 == 0 )$carbon_yt
+
+# Identify carbon pixel data associated with deforestation from 2000 to 2021 from matching data
+loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & forest_yC2021 == 0 )$carbon_yt
   
 
-
-  
+# Calculate metrics about carbon in deforestation pixels.
   mean_pos_carbon<- mean(loss_pos_carbon)
   sum_pos_carbon<- sum(loss_pos_carbon)
-  
-  
+
   sum_control_pos_carbon_2000<- sum(control_pos_carbon_2000, na.rm=T)
   sum_control_pos_carbon_2021<- sum(control_pos_carbon_2021, na.rm=T)
   
   mean_control_pos_carbon_2000<- mean(control_pos_carbon_2000, na.rm=T)
   mean_control_pos_carbon_2021<- mean(control_pos_carbon_2021, na.rm=T)
   
+  # Calculate the proportion of carbon retained and lost in pixels with forests after matching.
   Prop_noloss_carbon_control_pos<- (sum_control_pos_carbon_2021/sum_control_pos_carbon_2000)*100
   Prop_carbon_control_pos<- 100-Prop_noloss_carbon_control_pos
   
   
-  n_control_pos_carbon <- length(control_pos_carbon_2000)
-  prop_losscarb_control_pos <- Prop_carbon_control_pos/100
-  z <- qnorm(0.975)
-  lower_losscarb_control_pos <- (prop_losscarb_control_pos + z^2 / (2 * n_control_pos_carbon) - z * sqrt((prop_losscarb_control_pos * (1 - prop_losscarb_control_pos)) / n_control_pos_carbon)) / (1 + z^2 / n_control_pos_carbon)
-  upper_losscarb_control_pos <- (prop_losscarb_control_pos + z^2 / (2 * n_control_pos_carbon) + z * sqrt((prop_losscarb_control_pos * (1 - prop_losscarb_control_pos)) / n_control_pos_carbon)) / (1 + z^2 / n_control_pos_carbon)
-  lower_losscarb_control_pos<- lower_losscarb_control_pos*100
-  upper_losscarb_control_pos<- upper_losscarb_control_pos*100
+  # Estimate confidence intervals for carbon loss proportion in the control group pos-matching.
+  binomial_test_losscarb_control_pos<- 100* (1 - DescTools::BinomCI(x= sum_control_pos_carbon_2021, n= sum(control_pos_carbon_2000, na.rm=T), 
+                                                                    conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
   
+  lower_losscarb_control_pos<- min(binomial_test_losscarb_control_pos[c("lwr.ci", "upr.ci")])
+  upper_losscarb_control_pos<- max(binomial_test_losscarb_control_pos[c("lwr.ci", "upr.ci")])
   
-  
+  # Organize data
   dispersion_pos_carbon_effect <- list(t1= control_pos_carbon_2000, t2= control_pos_carbon_2021, loss= loss_pos_carbon) %>% 
     {lapply(names(.), function(x) data.frame(level= x, value= .[[x]]))} %>% rbind.fill() %>% 
     dplyr::mutate(level= factor(level, levels= c("t1", "t2", "loss")), treatment= "control_pos")
   
   
-  # treatment
+##  Pos-matching treatment
   treatment_pos_carbon_2000 = dplyr::filter(matched.cases_forest, forest_yT2000 == 1)$carbon_yt
   treatment_pos_carbon_2021 = dplyr::filter(matched.cases_forest, forest_yT2021 == 1)$carbon_yt
+  
+  # Calculate metrics about carbon in deforestation pixels.
+  mean_pos_carbon<- mean(loss_pos_carbon)
+  sum_pos_carbon<- sum(loss_pos_carbon)
   
   sum_treatment_pos_carbon_2000<- sum(treatment_pos_carbon_2000, na.rm=T)
   sum_treatment_pos_carbon_2021<- sum(treatment_pos_carbon_2021, na.rm=T)
   
+  mean_treatment_pos_carbon_2000<- mean(treatment_pos_carbon_2000, na.rm=T)
+  mean_treatment_pos_carbon_2021<- mean(treatment_pos_carbon_2021, na.rm=T)
+
+  
+  loss_treatment_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yT2000 == 1 & forest_yT2021 == 0 )$carbon_yt
+  mean_treatment_pos_carbon<- mean(loss_treatment_pos_carbon)
+  sum_treatment_pos_carbon<- sum(loss_treatment_pos_carbon)
+  
+  # Calculate the proportion of carbon retained and lost in pixels with forests after matching.
   Prop_noloss_carbon_treatment_pos<- (sum_treatment_pos_carbon_2021/sum_treatment_pos_carbon_2000)*100
   Prop_carbon_treatment_pos<- 100-Prop_noloss_carbon_treatment_pos
   
   
-  n_control_treatment_carbon <- length(treatment_pos_carbon_2000)
-  prop_losscarb_control_treatment <- Prop_carbon_treatment_pos/100
-  z <- qnorm(0.975)
-  lower_losscarb_control_treatment <- (prop_losscarb_control_treatment + z^2 / (2 * n_control_treatment_carbon) - z * sqrt((prop_losscarb_control_treatment * (1 - prop_losscarb_control_treatment)) / n_control_treatment_carbon)) / (1 + z^2 / n_control_treatment_carbon)
-  upper_losscarb_control_treatment <- (prop_losscarb_control_treatment + z^2 / (2 * n_control_treatment_carbon) + z * sqrt((prop_losscarb_control_treatment * (1 - prop_losscarb_control_treatment)) / n_control_treatment_carbon)) / (1 + z^2 / n_control_treatment_carbon)
-  lower_losscarb_control_treatment<- lower_losscarb_control_treatment*100
-  upper_losscarb_control_treatment<- upper_losscarb_control_treatment*100
+  # Estimate confidence intervals for carbon loss proportion in the treatment group pos-matching.
+  binomial_test_losscarb_treatment_pos<- 100* (1 - DescTools::BinomCI(x= sum_treatment_pos_carbon_2021, n= sum(treatment_pos_carbon_2000, na.rm=T), 
+                                                                    conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
   
+  lower_losscarb_treatment_pos<- min(binomial_test_losscarb_treatment_pos[c("lwr.ci", "upr.ci")])
+  upper_losscarb_treatment_pos<- max(binomial_test_losscarb_treatment_pos[c("lwr.ci", "upr.ci")])
   
-  
-  
-  loss_treatment_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yT2000 == 1 & forest_yT2021 == 0 )$carbon_yt
-  
-  mean_treatment_pos_carbon<- mean(loss_treatment_pos_carbon)
-  sum_treatment_pos_carbon<- sum(loss_treatment_pos_carbon)
-
-  mean_treatment_pos_carbon_2000<- mean(treatment_pos_carbon_2000, na.rm=T)
-  mean_treatment_pos_carbon_2021<- mean(treatment_pos_carbon_2021, na.rm=T)
-  
-  dispersion_carbon_effect <- list(t1= treatment_pos_carbon_2000, t2= treatment_pos_carbon_2021, loss= loss_treatment_pos_carbon) %>% 
+  # Organize data
+  dispersion_carbon_effect <- list(t1= treatment_pos_carbon_2000, t2= treatment_pos_carbon_2021, loss= loss_pos_carbon) %>% 
     {lapply(names(.), function(x) data.frame(level= x, value= .[[x]]))} %>% rbind.fill() %>% 
-    dplyr::mutate(level= factor(level, levels= c("t1", "t2", "loss")), treatment= "treatment")
-  
+    dplyr::mutate(level= factor(level, levels= c("t1", "t2", "loss")), treatment= "treatment_pos")
+
+  # Organize carbon analysis data
+  # This table summarizes carbon data for treatment and control groups pre- and post-matching, detailing carbon loss, non-loss proportions, their confidence intervals, and statistical significance. It provides an overview of carbon dynamics in response to forest management and deforestation across different periods and groups.
   summary_carbon<- data.frame(fd= c("treatment", "control_pos", "control_pre"),
                               sum_carbon_t1= c(sum_treatment_pos_carbon_2000, sum_control_pos_carbon_2000 , sum_control_pre_carbon_2000),
                               sum_carbon_t2= c(sum_treatment_pos_carbon_2021, sum_control_pos_carbon_2021 , sum_control_pre_carbon_2021),
@@ -637,8 +632,8 @@ plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_pro
                               mean_carbon_t1= c(mean_treatment_pos_carbon_2000, mean_control_pos_carbon_2000 , mean_control_pre_carbon_2000),
                               mean_carbon_t2= c(mean_treatment_pos_carbon_2021, mean_control_pos_carbon_2021 , mean_control_pre_carbon_2021),
                               mean_pixel = c(mean_treatment_pos_carbon, mean_pos_carbon, mean_pre_carbon),
-                              low_interval= c(lower_losscarb_control_treatment, lower_losscarb_control_pos, lower_losscarb_control_pre), 
-                              upper_interval= c(upper_losscarb_control_treatment, upper_losscarb_control_pos, upper_losscarb_control_pre),
+                              low_interval= c(lower_losscarb_treatment_pos, lower_losscarb_control_pos, lower_losscarb_control_pre), 
+                              upper_interval= c(upper_losscarb_treatment_pos, upper_losscarb_control_pos, upper_losscarb_control_pre),
                               zval_forest_2000_2021 = c(sign_Model_M_forest_2000_2021_sum, NA, NA),
                               zval_deforest_2000_2021 = c(sign_Model_M_deforest_2000_2021_sum, NA, NA)  ) %>%                         
     dplyr::mutate(type= type_gov, fd= factor(fd, levels=  c("treatment", "control_pos", "control_pre"))) %>% 
@@ -647,349 +642,8 @@ plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_pro
     dplyr::mutate(sign_deforest_2000_2021= sapply(.$zval_deforest_2000_2021, function(x) {
       if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"}  else {""} } )  )
   
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-  
-  
-  
-  
-  
-  
-  
-  ############################### Figuras VJRP
-  dir_work<- this.path::this.path() %>% dirname() # espacio de trabajo donde se almacena el codigo actual
-  
-  # plot coeffcients forests ~ governanza type
-  plot_varsForest<- ggplot(cofs_varsForest, aes(x = Value.Estimate, y = Coefficient)) +
-    geom_point(size= 1, color= ifelse( (cofs_varsForest$min_std) > 0, "blue", ifelse( (cofs_varsForest$max_std) < 0, "red", "black")))+
-    geom_segment( aes(x= min_std, xend = max_std, 
-                      yend = Coefficient), size= 0.5,
-                  color= ifelse( (cofs_varsForest$min_std) > 0, "blue", ifelse( (cofs_varsForest$max_std) < 0, "red", "black")))+
-    geom_text(
-      aes(label = sign_label, x = ifelse(Value.Estimate > 0, max_std, min_std)),
-      hjust = ifelse(cofs_varsForest$Value.Estimate > 0, -0.5, 1.5), 
-      size = 3, nudge_y = 0.15, 
-      color= ifelse( (cofs_varsForest$min_std) > 0, "blue", ifelse( (cofs_varsForest$max_std) < 0, "red", "black")) )+
-    labs(x = "Estimates", y = "Variables") +
-    scale_x_continuous(limits = c(-1,1))+
-    theme(legend.position =  "none",
-          plot.margin = margin(t = 0, r = 0,  b = 0,l = 0),
-          axis.ticks.length   = unit(0.3, "mm"),
-          text = element_text(size = 10),
-          panel.background = element_rect(fill = NA), panel.grid.major = element_line(color = "gray"),
-          axis.line = element_line(size = 0.5, colour = "black") )+
-    ggtitle(type_gov) 
-  
-  
-  # dendograma multicolinealidad
-  ggdendroPlot <-   ggplot()+
-    annotate("rect", xmin = -0.05, xmax = 1.04, fill = var_table$col,ymin = var_table$y_min , ymax = var_table$y_max, alpha = 0.75 )+
-    geom_segment(data= segment_data, aes(x = 1-x, y = y, xend = 1-xend, yend = yend, label= cor), size= 0.3)+
-    scale_y_continuous(breaks = cordend_data$labels$x,  labels = cordend_data$labels$label )+
-    coord_cartesian(expand = F)+
-    labs(x= "Correlation", y= "Variables") +
-    geom_vline(xintercept = cor_threshold, linetype = "dashed", col= "red") +
-    theme(legend.position =  "bottom", legend.key.width = unit(50, 'pt'),
-          plot.margin = margin(t = 0, r = 0,  b = 0,l = 0),
-          panel.grid.major = element_line(color = "gray"),
-          axis.ticks.length   = unit(0.3, "mm"),
-          text = element_text(size = 10))
-
-  # Mejores modelos
-  plot_better_model<-  ggplot()+
-    geom_tile(data= vars_models, aes(x= model , y= vars, fill = eval(sym(critera)) ), color="black", alpha= 0.5, size=0.2)+
-    scale_fill_gradientn(critera, colors = brewer.pal(11, "Spectral"))  
-  
-  
-  # Figura puntajes de propension
-  # Prematch propension
-  PreMatchingIndexData<- data.frame(abs(std.diff)) %>% set_names("Desequilibrio") %>% tibble::rownames_to_column(var="Variable") %>%  arrange(Desequilibrio)
-  PreMatchingIndexDataV2<- PreMatchingIndexData  %>%  arrange(desc(Desequilibrio)) %>%
-    mutate(Desequilibrio= ifelse(Desequilibrio>=100,100,Desequilibrio)) %>% 
-    mutate(Variable= factor(Variable, levels = unique(.$Variable)), label= paste0(paste(paste(rep("   ",3), collapse = ""), collapse = ""), Variable, sep=""))
-  
-  #### Parametros plot valores de desequilibrio prematch
-  y_axis_title_unbalanced_vars_prematch<- "Index of covariate imbalance"
-  x_axis_title_unbalanced_vars_prematch<- "Variables"
-  legend_title_unbalanced_vars_prematch<- "Pixeles de la ventana"
-  plot_title_unbalanced_vars_prematch<- "Pre Matching"
-  color_vline_unbalanced_vars_prematch<- "red"
-  pos_vline_unbalanced_vars_prematch<- 25
-  
-  ## generar plot  valores de desequilibrio
-  PreMatchingIndexPlot<- ggplot(data= PreMatchingIndexDataV2)+  
-    geom_segment(aes(x=0,  xend=Desequilibrio, y=Variable, yend=  Variable), size= 0.5) +
-    geom_point(aes(x=Desequilibrio, y= Variable), size= 1) +
-    labs(x= y_axis_title_unbalanced_vars_prematch, y= x_axis_title_unbalanced_vars_prematch)+
-    geom_vline(aes(xintercept= pos_vline_unbalanced_vars_prematch),  size= 0.5, linetype="dashed", color = color_vline_unbalanced_vars_prematch)+
-    theme(legend.position =  "none",
-          plot.margin = margin(t = 0, r = 0,  b = 0,l = 0),
-          axis.ticks.length   = unit(0.3, "mm"),
-          text = element_text(size = 10),
-          panel.background = element_rect(fill = NA), panel.grid.major = element_line(color = "gray"),
-          axis.line = element_line(size = 0.5, colour = "black") )+
-    scale_x_continuous(expand = c(0,0), limits = c(0,110))+
-    ggtitle(plot_title_unbalanced_vars_prematch)
-  
-  
-  # posmatch propension
-  # organizar datos puntaje
-  posmatchingIndexData<- data.frame(abs(std.diff1)) %>% set_names("Desequilibrio") %>% tibble::rownames_to_column(var="Variable") %>%  arrange(Desequilibrio)
-  posmatchingIndexDataV2<- posmatchingIndexData  %>%  arrange(desc(Desequilibrio)) %>%
-    mutate(Desequilibrio= ifelse(Desequilibrio>=100,100,Desequilibrio)) %>% 
-    mutate(Variable= factor(Variable, levels = unique(.$Variable)), label= paste0(paste(paste(rep("   ",3), collapse = ""), collapse = ""), Variable, sep=""))
-  
-  #### Parametros plot valores de desequilibrio
-  y_axis_title_unbalanced_vars_posmatch<- "Index of covariate imbalance"
-  x_axis_title_unbalanced_vars_posmatch<- "Variables"
-  legend_title_unbalanced_vars_posmatch<- "Pixeles de la ventana"
-  plot_title_unbalanced_vars_posmatch<- "Pos Matching"
-  color_vline_unbalanced_vars_posmatch<- "red"
-  pos_vline_unbalanced_vars_posmatch<- 25
-  
-  ## generar plot  valores de desequilibrio
-  posmatchingIndexPlot<- ggplot(data= posmatchingIndexDataV2)+  
-    geom_segment(aes(x=0,  xend=Desequilibrio, y=Variable, yend=  Variable), size= 0.5) +
-    geom_point(aes(x=Desequilibrio, y= Variable), size= 1) +
-    labs(x= y_axis_title_unbalanced_vars_posmatch, y= x_axis_title_unbalanced_vars_posmatch)+
-    geom_vline(aes(xintercept= pos_vline_unbalanced_vars_posmatch),  size= 0.5, linetype="dashed", color = color_vline_unbalanced_vars_posmatch)+
-    theme(legend.position =  "none",
-          plot.margin = margin(t = 0, r = 0,  b = 0,l = 0),
-          axis.ticks.length   = unit(0.3, "mm"),
-          text = element_text(size = 10),
-          panel.background = element_rect(fill = NA), panel.grid.major = element_line(color = "gray"),
-          axis.line = element_line(size = 0.5, colour = "black") )+
-    scale_x_continuous(expand = c(0,0), limits = c(0,110))+
-    ggtitle(plot_title_unbalanced_vars_posmatch)
-  
-  summ_matching_index_plot<- ggpubr::ggarrange(plotlist = list(PreMatchingIndexPlot, posmatchingIndexPlot) )
-  
-  
-  ## V2 - Figura Index of covariate imbalance  
-  summ_Imbalancedata<- plyr::rbind.fill(list( dplyr::mutate(PreMatchingIndexDataV2, Match= "Unmatched"),  dplyr::mutate(posmatchingIndexDataV2, Match= "Matched")))
-  
-  gg_summ_Imbalancedata<- ggplot(data= summ_Imbalancedata)+  
-    geom_point(aes(x=Desequilibrio, y= Variable, color= Match), size= 1) +
-    labs(x= y_axis_title_unbalanced_vars_posmatch, y= x_axis_title_unbalanced_vars_posmatch)+
-    geom_vline(aes(xintercept= pos_vline_unbalanced_vars_posmatch),  size= 0.5, linetype="dashed", color = color_vline_unbalanced_vars_posmatch)+
-    theme(
-          plot.margin = margin(t = 0, r = 0,  b = 0,l = 0),
-          axis.ticks.length   = unit(0.3, "mm"),
-          text = element_text(size = 10),
-          panel.background = element_rect(fill = NA), panel.grid.major = element_line(color = "gray"),
-          axis.line = element_line(size = 0.5, colour = "black") )+
-    scale_x_continuous(expand = c(0,0), limits = c(0,110))+
-    ggtitle(type_gov)
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  # Figura desbalance prematch
-  includedListPreMatching<- split(data, data[, type_gov])
-  
-  #### Parametros graficos ps values pre match
-  in_area_prematch<- list(title=  paste0("In ", type_gov), color= "goldenrod")
-  out_area_prematch<- list(title=  paste0("Out ", type_gov), color= "olivedrab")
-  y_axis_title_prematch <- "Number of Units"
-  x_axis_title_prematch <- "Propensity Score"
-  legend_title_prematch <- "Window Pixels"
-  plot_title_prematch <- "Pre Matching"
-  
-  PreMatchversusplot<- ggplot(data= includedListPreMatching[["0"]])+
-    geom_histogram(data= includedListPreMatching[["1"]],  aes(x = psvalue, y = ..count.., 
-                                                              fill= in_area_prematch$title, color= in_area_prematch$title )) +
-    geom_histogram( aes(x = psvalue, y = -..count.., fill= out_area_prematch$title, color= out_area_prematch$title))+
-    scale_y_continuous(labels = abs) + scale_fill_manual(legend_title_prematch, values = alpha(c(out_area_prematch$color, in_area_prematch$color),0.5) ) +
-    scale_color_manual(legend_title_prematch, values = alpha(c(out_area_prematch$color, in_area_prematch$color),1) ) +
-    labs(x= x_axis_title_prematch, y= y_axis_title_prematch) + ggtitle(plot_title_prematch) +     
-    guides(size = "none", fill = guide_legend(title.position="top", title.hjust = 0.5))+
-    theme(panel.background = element_rect(fill = NA), 
-          panel.grid.major = element_line(color = "gray"),
-          legend.position =  "bottom", text = element_text(size = 10),
-          panel.border = element_rect(color = NA,fill = NA),
-          axis.line = element_line(colour = "black", size = 0.05, linetype = "solid"))
-  
-  
-  # Figura desbalance posmatch
-  includedListposmatching<- split(y, y[, type_gov])
-  
-  #### Parametros graficos ps values pos match
-  in_area_posmatch<- list(title= paste0("In ", type_gov), color= "goldenrod")
-    out_area_posmatch<- list(title= paste0("Out ", type_gov), color= "olivedrab")
-  y_axis_title_posmatch <- "Number of Units"
-  x_axis_title_posmatch <- "Propensity Score"
-  legend_title_posmatch <- "Window Pixels"
-  plot_title_posmatch <- "Pos Matching"
-  
-  
-  posmatchversusplot<- ggplot(data= includedListposmatching[["0"]])+
-    geom_histogram(data= includedListposmatching[["1"]],  aes(x = psvalue, y = ..count.., 
-                                                              fill= in_area_posmatch$title, color= in_area_posmatch$title )) +
-    geom_histogram( aes(x = psvalue, y = -..count.., fill= out_area_posmatch$title, color= out_area_posmatch$title))+
-    scale_y_continuous(labels = abs) + scale_fill_manual(legend_title_posmatch, values = alpha(c(out_area_posmatch$color, in_area_posmatch$color),0.5) ) +
-    scale_color_manual(legend_title_posmatch, values = alpha(c(out_area_posmatch$color, in_area_posmatch$color),1) ) +
-    labs(x= x_axis_title_posmatch, y= y_axis_title_posmatch) +
-    scale_x_continuous(limits = c(0,1))+  ggtitle(plot_title_posmatch) +     
-    guides(size = "none", fill = guide_legend(title.position="top", title.hjust = 0.5))+
-    theme(panel.background = element_rect(fill = NA), 
-          panel.grid.major = element_line(color = "gray"),
-          legend.position =  "bottom", text = element_text(size = 10),
-          panel.border = element_rect(color = NA,fill = NA),
-          axis.line = element_line(colour = "black", size = 0.05, linetype = "solid"))
-  
-  summ_matching_propension_plot<- ggpubr::ggarrange(plotlist = list(PreMatchversusplot, posmatchversusplot), common.legend = T,
-                                                    legend = "bottom")
-  
-  
-  
-  
-  #### Parametros graficos Figura peresistencia de forest
-  summary_forest
-
-  guide_fill_forest<- list(
-    data.frame(fd= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
-    data.frame(fd= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
-    data.frame(fd= "treatment", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
-  ) %>% rbind.fill()
-  
-  guide_xaxis_forest <- list(
-    data.frame(fd= "control_pre", label_x= "Control preMatching" ),
-    data.frame(fd= "control_pos", label_x = "Control posMatching" ),
-    data.frame(fd= "treatment", label_x = "Treatment" )
-  ) %>% rbind.fill()
-  
-  
-  y_axis_title_result_forest<- "Forest loss (%)"
-  x_axis_title_result_forest<- type_gov
-  legend_title_result_forest<- ""
-  plot_title_result_forest<- paste("Forests", type_gov)
-  
-  
-  dataplot_forest<- summary_forest %>%
-    dplyr::mutate(fd= factor( fd, levels = unique(.$fd) )) %>% 
-    list(guide_fill_forest, guide_xaxis_forest) %>% plyr::join_all() %>% 
-    dplyr::mutate(
-      label_fill= factor(label_fill, unique(guide_fill_forest$label_fill)),
-      label_x= factor(label_x, levels= unique(guide_xaxis_forest$label_x))
-    )
-      
-  
-  plot_forest<- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss , fill= label_fill))+
-    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                  width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-    # geom_signif(position="identity",  textsize = 5, comparisons=list(c("Control posMatching","Treatment")) , annotations = dataplot_forest$sign_forest_2000_2021[1])+
-        xlab(x_axis_title_result_forest)+ylab(y_axis_title_result_forest)+
-    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
-    scale_fill_manual(legend_title_result_forest,  values = setNames(guide_fill_forest$color_fill ,guide_fill_forest$label_fill) )+
-    theme_minimal()+
-    theme(legend.position = "bottom",
-          axis.text.x  = element_blank(),
-          axis.line.y = element_line(color = "black"),
-          axis.line.x = element_line(color = "black"))
-  
-  
-  
-  
-  
-  
-  
-  
-  plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss , fill= label_fill))+
-    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                  width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-    geom_signif(position="identity",  textsize = 5, comparisons=list(c("Control posMatching","Treatment")) , annotations = dataplot_forest$sign_forest_2000_2021[1])+
-    xlab(x_axis_title_result_forest)+ylab(y_axis_title_result_forest)+
-    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
-    scale_fill_manual(legend_title_result_forest,  values = setNames(guide_fill_forest$color_fill ,guide_fill_forest$label_fill) )+
-    theme_minimal()+
-    theme(legend.position = "bottom",
-          axis.text.x  = element_blank(),
-          axis.line.y = element_line(color = "black"),
-          axis.line.x = element_line(color = "black"))
-  
-  
-  
-  
-  
-  
-  
-  
-  #### Parametros graficos Figura peresistencia de carbon
-
-  guide_fill_carbon<- list(
-    data.frame(fd= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
-    data.frame(fd= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
-    data.frame(fd= "treatment", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
-  ) %>% rbind.fill()
-  
-  guide_xaxis_carbon <- list(
-    data.frame(level= "mean_carbon_t1", label_x= "Forests 2000"),
-    data.frame(level= "mean_carbon_t2", label_x= "Forests 2021")
-  ) %>% rbind.fill()
-
-
-  data_plot_carbon<-   melt(data.table(summary_carbon)[,c("fd", "mean_carbon_t1", "mean_carbon_t2")], 
-                            id.vars = "fd", variable.name = "level", 
-                            value.name = "value") %>% 
-    list(guide_xaxis_carbon, guide_fill_carbon) %>% join_all() %>% 
-    dplyr::mutate(
-      label_fill= factor(label_fill, unique(guide_fill_carbon$label_fill)),
-      label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x))
-    )
-  
-  data_sum_plot_carbon<- melt(data.table(summary_carbon)[,c("fd", "sum_carbon_t1", "sum_carbon_t2")], 
-                              id.vars = "fd", variable.name = "level", 
-                              value.name = "sum_carbon") %>% dplyr::mutate(level= gsub("sum_", "mean_",level)) %>% 
-    list(data_plot_carbon) %>% join_all()
-  
-  
-  y_axis_title_result_carbon_mean<- "Mean Carbon loss by pixel"
-  
-  plot_carbon<- ggplot()+geom_bar(data= data_plot_carbon,  aes(x= label_x , y= value*100 , fill= label_fill), stat = "identity",
-                      width = 0.4, size= 0.1, position = position_dodge(width  = .8) )+
-    xlab("")+ylab(y_axis_title_result_carbon_mean)+
-    scale_fill_manual("",
-                      values = setNames(guide_fill_carbon$color_fill ,
-                                        guide_fill_carbon$label_fill) )  +
-    theme_minimal()+
-    theme(
-      axis.text.x = element_blank(),
-      axis.title.x = element_blank(),
-      axis.text.y = element_text(angle = 90, hjust = 1),
-      axis.line.y = element_line(color = "black"),
-      axis.line.x = element_line(color = "black"))
-  
-  
-  
-  
-  
-  
-  
-  ### Loss carbon
-  
+  # Plotting carbon estimations
+  # Define the colors and labels for the plotting
   guide_fill_carbon<- list(
     data.frame(fd= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
     data.frame(fd= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
@@ -1000,8 +654,7 @@ plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_pro
     data.frame(fd= "control_pre", label_x= "Control preMatching"),
     data.frame(fd= "control_pos", label_x= "Control posMatching"),
     data.frame(fd= "treatment", label_x = "Treatment")
-    ) %>% rbind.fill()
-  
+  ) %>% rbind.fill()
   
   y_axis_title_result_carbon<- "Proportion of Carbon loss (%)"
   x_axis_title_result_carbon<- type_gov
@@ -1012,17 +665,81 @@ plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_pro
     dplyr::mutate(fd= factor( fd, levels = unique(.$fd) )) %>% 
     list(guide_fill_carbon, guide_xaxis_carbon) %>% plyr::join_all() %>% 
     dplyr::mutate( label_fill= factor(label_fill, unique(guide_fill_carbon$label_fill)),
-                  label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x)) )
+                   label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x)) )
   
   
   
   
-  #### Parametros graficos figura dispersion pixeles de carbon
+  
+  
+  # plot the proportion of carbon loss 
+  plot_loss_carbon<- ggplot(data= dataplot_carbon,  aes(x= type, y= sum_carbon_prop_loss , fill= label_fill))+
+    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
+    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
+                  width = 0.05, position =  position_dodge(width  = .8), color = "black")+
+    xlab(x_axis_title_result_carbon)+
+    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%"))+
+    scale_fill_manual(legend_title_result_carbon, 
+                      values = setNames(guide_fill_carbon$color_fill ,
+                                        guide_fill_carbon$label_fill) )+
+    theme_minimal()+ylab(y_axis_title_result_carbon)+
+    theme(
+      axis.text.x = element_blank(),
+      axis.title.x = element_blank(),
+      axis.text.y = element_text(angle = 90, hjust = 1),
+      axis.line.y = element_line(color = "black"),
+      axis.line.x = element_line(color = "black"))
+  
+  
+  plot_loss_carbon_fin<- ggplot(data= dataplot_carbon,  aes(x= label_x, y= sum_carbon_prop_loss , fill= label_fill))+
+    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
+    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
+                  width = 0.1, position =  position_dodge(width  = .8), color = "black")+
+    # geom_signif(position="identity",  textsize = 5, comparisons=list(c("Control posMatching","Treatment")) ,annotations = dataplot_carbon$sign_forest_2000_2021[1])+
+    xlab(x_axis_title_result_carbon)+ylab(y_axis_title_result_carbon)+
+    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
+    scale_fill_manual(legend_title_result_carbon,  values = setNames(guide_fill_carbon$color_fill ,guide_fill_carbon$label_fill) )+
+    theme_minimal()+
+    theme(legend.position = "bottom",
+          axis.text.x  = element_blank(),
+          axis.line.y = element_line(color = "black"),
+          axis.line.x = element_line(color = "black"))
+  
+  # plot the proportion of carbon loss  with significance annotations
+  plot_loss_carbon_sign <- ggplot(data= dataplot_carbon,  aes(x= label_x, y= sum_carbon_prop_loss , fill= label_fill))+
+    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
+    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
+                  width = 0.1, position =  position_dodge(width  = .8), color = "black")+
+    geom_signif(position="identity",  textsize = 5, comparisons=list(c("Control posMatching","Treatment")) ,annotations = dataplot_carbon$sign_forest_2000_2021[1])+
+    xlab(x_axis_title_result_carbon)+ylab(y_axis_title_result_carbon)+
+    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
+    scale_fill_manual(legend_title_result_carbon,  values = setNames(guide_fill_carbon$color_fill ,guide_fill_carbon$label_fill) )+
+    theme_minimal()+
+    theme(legend.position = "bottom",
+          axis.text.x  = element_blank(),
+          axis.line.y = element_line(color = "black"),
+          axis.line.x = element_line(color = "black"))
+  
+  plot_loss_carbon_sign
+  
+  
+  # Arrange the forest and carbon loss plots into a single figure
+  plot_response_sign <- ggpubr::ggarrange(
+    plotlist = list(plot_forest_sign, plot_loss_carbon_sign),  # List of plots to arrange
+    common.legend = TRUE,  # Use a single common legend for all plots
+    legend = "bottom"  # Position the legend at the bottom of the arranged figure
+  )
+  
+  plot_response_sign
+  
 
+##  Plotting carbon disperssion estimations
+  # Define the colors and labels for the plotting
+  
   guide_fill_carbon_disperssion<- list(
     data.frame(treatment= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
     data.frame(treatment= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
-    data.frame(treatment= "treatment", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
+    data.frame(treatment= "treatment_pos", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
     ) %>% rbind.fill()
   
   guide_xaxis_carbon_disperssion<- list(
@@ -1035,7 +752,9 @@ plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_pro
   x_axis_title_result_carbon_disperssion<- "Forest Over Time"
   legend_title_result_carbon_disperssion<- ""
   plot_title_result_carbon_disperssion<- paste("Carbon ", type_gov)
+  limits_axis_y<- boxplot.stats(dataplot_carbon_disperssion$value)$stats %>% {c(min(.), max(.))}
   
+  # Organize data
   dataplot_carbon_disperssion <- list(dispersion_pre_carbon_effect, 
                                       dispersion_pos_carbon_effect, 
                                       dispersion_carbon_effect) %>%
@@ -1045,12 +764,10 @@ plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_pro
                   label_fill= factor(label_fill, unique(guide_fill_carbon_disperssion$label_fill))
                   )
   
-  
   dataplot_carbon_disperssion_t1_t2<- dplyr::filter(dataplot_carbon_disperssion, !level %in% "loss")
   dataplot_carbon_disperssion_loss<- dplyr::filter(dataplot_carbon_disperssion, level %in% "loss")
   
-  limits_axis_y<- boxplot.stats(dataplot_carbon_disperssion$value)$stats %>% {c(min(.), max(.))}
-
+  # plot the disperssion of carbon by pixel between two periods
   plot_carbon_disperssion_t1_t2<- ggplot(dataplot_carbon_disperssion_t1_t2, aes(x = label_x, y = value, fill= label_fill)) +
     stat_slab(side = "right", scale = 0.4,show.legend = T,expand = F, 
               position = position_dodge(width = .8), aes(fill_ramp = stat(level) ), 
@@ -1067,12 +784,8 @@ plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_pro
       axis.text.y = element_text(angle = 90, hjust = 1),
           axis.line.y = element_line(color = "black"),
           axis.line.x = element_line(color = "black"))
-  
-  
-  
-  
-  
-  
+
+  # plot for carbon loss dispersion pixels
   plot_carbon_disperssion_loss<- ggplot(dataplot_carbon_disperssion_loss, aes(x = label_x, y = value, fill= label_fill)) +
     stat_slab(side = "right", scale = 0.4,show.legend = T,expand = F, 
               position = position_dodge(width = .8), aes(fill_ramp = stat(level) ), 
@@ -1092,84 +805,13 @@ plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_pro
           axis.line.x = element_line(color = "black"))
   
   
-  
-  plot_loss_carbon<- ggplot(data= dataplot_carbon,  aes(x= type, y= sum_carbon_prop_loss , fill= label_fill))+
-    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                  width = 0.05, position =  position_dodge(width  = .8), color = "black")+
-    xlab(x_axis_title_result_carbon)+
-    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%"))+
-    scale_fill_manual(legend_title_result_carbon, 
-                      values = setNames(guide_fill_carbon$color_fill ,
-                                        guide_fill_carbon$label_fill) )+
-    theme_minimal()+ylab(y_axis_title_result_carbon)+
-    theme(
-      axis.text.x = element_blank(),
-      axis.title.x = element_blank(),
-      axis.text.y = element_text(angle = 90, hjust = 1),
-      axis.line.y = element_line(color = "black"),
-      axis.line.x = element_line(color = "black"))
-  
-  
-  
-  plot_loss_carbon_fin<- ggplot(data= dataplot_carbon,  aes(x= label_x, y= sum_carbon_prop_loss , fill= label_fill))+
-    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                  width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-    # geom_signif(position="identity",  textsize = 5, comparisons=list(c("Control posMatching","Treatment")) ,annotations = dataplot_carbon$sign_forest_2000_2021[1])+
-    xlab(x_axis_title_result_carbon)+ylab(y_axis_title_result_carbon)+
-    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
-    scale_fill_manual(legend_title_result_carbon,  values = setNames(guide_fill_carbon$color_fill ,guide_fill_carbon$label_fill) )+
-    theme_minimal()+
-    theme(legend.position = "bottom",
-          axis.text.x  = element_blank(),
-          axis.line.y = element_line(color = "black"),
-          axis.line.x = element_line(color = "black"))
-  
-  
-  
-  plot_loss_carbon_sign <- ggplot(data= dataplot_carbon,  aes(x= label_x, y= sum_carbon_prop_loss , fill= label_fill))+
-    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                  width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-     geom_signif(position="identity",  textsize = 5, comparisons=list(c("Control posMatching","Treatment")) ,annotations = dataplot_carbon$sign_forest_2000_2021[1])+
-    xlab(x_axis_title_result_carbon)+ylab(y_axis_title_result_carbon)+
-    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
-    scale_fill_manual(legend_title_result_carbon,  values = setNames(guide_fill_carbon$color_fill ,guide_fill_carbon$label_fill) )+
-    theme_minimal()+
-    theme(legend.position = "bottom",
-          axis.text.x  = element_blank(),
-          axis.line.y = element_line(color = "black"),
-          axis.line.x = element_line(color = "black"))
-  
-  
-
-  plot_carbon_final<- ggarrange(plotlist =
-                                        list(plot_carbon, plot_loss_carbon,
+  # Display the final compiled disperssion carbon plot
+  plot_carbon_final<- ggarrange(plotlist = list(plot_carbon, plot_loss_carbon,
                                              plot_carbon_disperssion_t1_t2, 
                                              plot_carbon_disperssion_loss),
-                                      common.legend = T, legend = "bottom", nrow = 2, ncol=2 ) %>% 
-    annotate_figure( bottom = text_grob( paste0("\u25B2: Sum total Carbon loss by pixel" ),
-                                         size = 8) )
-  
+                                      common.legend = T, legend = "bottom", nrow = 2, ncol=2 )
 
-  ## resumen variables analizadas
-  plot_response<- ggpubr::ggarrange(plotlist = list(plot_forest, plot_loss_carbon_fin), common.legend = T, legend = "bottom")
-  plot_response_sign<- ggpubr::ggarrange(plotlist = list(plot_forest_sign, plot_loss_carbon_sign), common.legend = T, legend = "bottom")
+  plot_carbon_final
   
-  
-  
-  
-  
-  propensityScore_data<- list( data.frame(PreMatchingIndexDataV2, type_match= "Pre Matching", type_gov= type_gov)  ,
-                               data.frame(posmatchingIndexDataV2, type_match= "Pos Matching", type_gov= type_gov)
-  ) %>% plyr::rbind.fill() %>% dplyr::mutate(period= "2000")
-  
-  openxlsx::write.xlsx(propensityScore_data, paste0(type_gov, "_", "propensityScore_data", ".xlsx") )
-  
-  
-  # Guardar resultados
-  setwd(dir_work)
-  save.image(paste0(type_gov, ".RData"))
   
   
