@@ -1,6 +1,6 @@
 # List necessary packages
 packages_list<-list("magrittr", "dplyr", "plyr", "MatchIt", "RItools", "Hmisc", "this.path", "scales", "ggdendro", "data.table", "openxlsx",
-                    "tibble", "leaps", "pbapply", "RColorBrewer", "ggpubr", "ggdist")
+                    "tibble", "leaps", "pbapply", "RColorBrewer", "ggpubr", "ggdist", "ggh4x")
 
 # Install necessary packages not installed
 packagesPrev<- .packages(all.available = TRUE)
@@ -26,6 +26,7 @@ output<- file.path(dirname(dir_work), "output")
 setwd(input)
 data<- read.csv("data.csv", header = T)
 
+
 names(data)
 head(data)
 
@@ -39,6 +40,7 @@ table(data[,type_gov])
 covars<-c( "Department", "Anual_Prec", "Prec_Seas",  "Dis_Def",    "Dis_Rivers",
           "District_R", "Departme_R", "National_R", "D7Set10",    "D7Set1000",  "D7Set5000",  "D7Set10000", "D17Set10",   "D17Set1000", "D17Set5000",
           "D17Set10000", "Ecoregions", "Elevation",  "Pop2000",    "Pop2020",    "Slope",      "Tra_Time00", "Tra_Time15")
+
 
 
 # test multicolinearity ####
@@ -138,7 +140,6 @@ print(better_models)
 # Allows the researcher to review the ranked models based on selected criteria (default: AIC)
 critera<- "AIC" # DEFAULT
 
-
 # Collates variables from the best AIC models, ranks them by frequency of appearance, and prepares them for visualization analysis.
 data_vars<-  rbind.fill(purrr::map(AIC_models, "data_vars")) %>% list(better_models) %>% 
     join_all() %>%  dplyr::group_by(vars) %>% dplyr::mutate(freq_var= n()) %>% 
@@ -172,7 +173,6 @@ plot_better_model
 
 # Propensity scores calculation. Propensity scores estimate the probability of treatment assignment based on observed covariates
 # Identifies the 'treated' group based on 'type_gov' == 1, then calculates the standardized differences for selected variables. These differences help in assessing the balance between treated and untreated groups before matching.
-
 treated <-(data[,type_gov] ==1) 
 cov <-data[,selected_variables]
 std.diff <-apply(cov,2,function(x) 100*(mean(x[treated])- mean(x[!treated]))/(sqrt(0.5*(var(x[treated]) + var(x[!treated]))))) %>% abs()
@@ -197,17 +197,25 @@ PreMatchingIndexDataV2
 # Execute matching analysis ####
 # Performs matching based on the specified criteria to balance the treatment and control groups, enhancing the validity of causal inferences. 
 # The 'formula_glm' defines the treatment indicator and covariates for matching, 'method = "nearest"' specifies nearest neighbor matching to pair individuals based on similarity in propensity scores, and 'ratio = 1' ensures a 1:1 match between treated and untreated units, aiming for the closest match possible without replacement.
-m.nn <- matchit(formula_glm, data =data, method= "nearest", ratio = 1)
+
+m.nn <- matchit(MC ~ Ecoregions + National_R + Tra_Time00 + Dis_Def + D7Set10000 + 
+                  Department + D7Set1000 + Slope + Dis_Rivers + Pop2000 + Departme_R + 
+                  District_R + D7Set10 + D17Set5000 + D7Set5000 + D17Set10 + 
+                  Elevation + Anual_Prec + Prec_Seas, data =data, method= "nearest", ratio = 1)
+
+
+
+
+
 
 # Extracts the matched dataset and calculates the deforestation indicator. 'deforest' is defined as 1 if the forest status changed from present ('Fores_2000' == 1) to absent ('Fores_2021' == 0) over the study period, and 0 otherwise. This step prepares the data for subsequent analysis of treatment effects on deforestation.
 y=match.data(m.nn, group="all")
 
 # Propensity scores calculation. 
 treated1 <-(y[, type_gov]==1)
+
 cov1 <-y[, selected_variables]
 std.diff1 <-apply(cov1,2,function(x) 100*(mean(x[treated1])- mean(x[!treated1]))/(sqrt(0.5*(var(x[treated1]) + var(x[!treated1]))))) 
-  
-
   
 # Organizes standardized differences for easy analysis and visualization
 posmatchingIndexData<- data.frame(abs(std.diff1)) %>% set_names("imbalance") %>% tibble::rownames_to_column(var="Variable") %>%  arrange(imbalance)
@@ -335,12 +343,17 @@ carbon_yC<- y$Carbon_pixel[group2]
 ## summ match  
 matched.cases_forest <- cbind(matches, forest_yT2000, forest_yT2021, forest_yC2000, forest_yC2021, carbon_yt, carbon_yC)
 
+
 ## Organize control data ####
 
 # control_pre matching. Use the entire dataset to define the control group before matching to understand baseline conditions.
-Control <- data
+Control <- data[data[,type_gov] %in% 0, ]
 control_pre_forest_2020 =sum(Control$Fores_2000)
-control_pre_forest_2021 =sum(Control$Fores_2021) 
+control_pre_forest_2021 =sum(Control$Fores_2021)
+
+
+
+
 
 # Calculate the proportion of forest pixels that remained unchanged in the control group pre-matching.
 Prop_noloss_forest_control_pre= (control_pre_forest_2021/control_pre_forest_2020)*100
@@ -485,14 +498,24 @@ plot_forest<- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss
         axis.line.y = element_line(color = "black"),
         axis.line.x = element_line(color = "black"))
 
+
+
+
 # plot the proportion of forest loss  with significance annotations
+y_pos<- max(dataplot_forest$upper_interval)+1;
+
+# Calculate the delta of forest loss for labeling on the plot
+max_forest_summary<- summary_forest$upper_interval %>%  {max(., na.rm = T)+abs(sd(.))} # valor maximo barra
+ylimits_forest_summary<- c(0, max_forest_summary)
+
+# plot the signicances of analyusis of proportion of forest loss 
 plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss , fill= label_fill))+
   geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
   geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
                 width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-  geom_signif(position="identity",  textsize = 5, comparisons=list(c("Control posMatching","Treatment")) , annotations = dataplot_forest$sign_forest_2000_2021[1] )+
-  xlab(x_axis_title_result_forest)+ylab(y_axis_title_result_forest)+
-  scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
+  geom_signif(y_position = y_pos, xmin = c(2.5-0.4), xmax = c(2.5+0.4), tip_length = c(0.01, 0.01), size=0.3,   annotation = dataplot_forest$sign_forest_2000_2021[1] )+
+xlab(x_axis_title_result_forest)+ylab(y_axis_title_result_forest)+
+  scale_y_continuous(limits = ylimits_forest_summary, labels = function(x) paste0(x, "%")) +
   scale_fill_manual(legend_title_result_forest,  values = setNames(guide_fill_forest$color_fill ,guide_fill_forest$label_fill) )+
   theme_minimal()+
   theme(legend.position = "bottom",
@@ -502,14 +525,6 @@ plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_pro
 
 
 
-
-
-
-
-
-  
-    
-                  
   
 ########### Carbon effect
 
@@ -656,7 +671,7 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
     data.frame(fd= "treatment", label_x = "Treatment")
   ) %>% rbind.fill()
   
-  y_axis_title_result_carbon<- "Proportion of Carbon loss (%)"
+  y_axis_title_result_carbon<- c(expression(CO[2]~"emissions (%)"))
   x_axis_title_result_carbon<- type_gov
   legend_title_result_carbon<- ""
   plot_title_result_carbon<- paste("Carbon", type_gov)
@@ -667,22 +682,34 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
     dplyr::mutate( label_fill= factor(label_fill, unique(guide_fill_carbon$label_fill)),
                    label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x)) )
   
+
+  data_plot_carbon<-   melt(data.table(summary_carbon)[,c("fd", "mean_carbon_t1", "mean_carbon_t2")], 
+                            id.vars = "fd", variable.name = "level", 
+                            value.name = "value") %>% 
+    list(guide_xaxis_carbon, guide_fill_carbon) %>% join_all() %>% 
+    dplyr::mutate(
+      label_fill= factor(label_fill, unique(guide_fill_carbon$label_fill)),
+      label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x))
+    )
   
-  
+  data_sum_plot_carbon<- melt(data.table(summary_carbon)[,c("fd", "sum_carbon_t1", "sum_carbon_t2")], 
+                              id.vars = "fd", variable.name = "level", 
+                              value.name = "sum_carbon") %>% dplyr::mutate(level= gsub("sum_", "mean_",level)) %>% 
+    list(data_plot_carbon) %>% join_all()
   
   
   
   # plot the proportion of carbon loss 
-  plot_loss_carbon<- ggplot(data= dataplot_carbon,  aes(x= type, y= sum_carbon_prop_loss , fill= label_fill))+
-    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                  width = 0.05, position =  position_dodge(width  = .8), color = "black")+
-    xlab(x_axis_title_result_carbon)+
-    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%"))+
-    scale_fill_manual(legend_title_result_carbon, 
+  
+  y_axis_title_result_carbon_mean<- "Mean Carbon loss by pixel"
+
+  plot_carbon<- ggplot()+geom_bar(data= data_plot_carbon,  aes(x= label_x , y= value*100 , fill= label_fill), stat = "identity",
+                                  width = 0.4, size= 0.1, position = position_dodge(width  = .8) )+
+    xlab("")+ylab(y_axis_title_result_carbon_mean)+
+    scale_fill_manual("",
                       values = setNames(guide_fill_carbon$color_fill ,
-                                        guide_fill_carbon$label_fill) )+
-    theme_minimal()+ylab(y_axis_title_result_carbon)+
+                                        guide_fill_carbon$label_fill) )  +
+    theme_minimal()+
     theme(
       axis.text.x = element_blank(),
       axis.title.x = element_blank(),
@@ -695,7 +722,6 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
     geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
     geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
                   width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-    # geom_signif(position="identity",  textsize = 5, comparisons=list(c("Control posMatching","Treatment")) ,annotations = dataplot_carbon$sign_forest_2000_2021[1])+
     xlab(x_axis_title_result_carbon)+ylab(y_axis_title_result_carbon)+
     scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
     scale_fill_manual(legend_title_result_carbon,  values = setNames(guide_fill_carbon$color_fill ,guide_fill_carbon$label_fill) )+
@@ -730,9 +756,61 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
     legend = "bottom"  # Position the legend at the bottom of the arranged figure
   )
   
-  plot_response_sign
+  
+  
+## Plotting carbon and forest estimations summary plot
+  # Define the colors and labels for the plotting
+  y_secondaxis_carbon_summary<- c(expression(CO[2]~"emissions (%)"))
+  legend_label_carbon_summary<- c(expression(CO[2]~"emissions (%)")) # etiqueta de carbon en leyenda
+  color_bar_carbon_summary<- "red" # ancho de barra carbon
+  alpha_bar_carbon_summary<- 0.5 # transparencia barra carbon
+  size_bar_carbon_summary<- 1 # grosor de barra carbon
+  height_bar_carbon_summary<- 1 # altura de barra carbon
+  size_point_carbon_summary<- 3 # grosor de barra carbon
+  
+  
+  # Organize and Prepare Data for Combined Carbon and Forest Plot
+  dataplot_carbon_bars<-   summary_carbon %>% 
+    list(guide_xaxis_forest, guide_fill_forest) %>% join_all() %>% 
+    dplyr::mutate(
+      label_fill= factor(label_fill, unique(guide_fill_forest$label_fill)),
+      label_x= factor(label_x, levels= unique(guide_xaxis_forest$label_x))) %>% 
+    dplyr::select(label_x, sum_carbon_prop_loss, label_fill, sum_carbon_prop_loss ) %>% dplyr::distinct() %>% 
+    group_by(label_x) %>% dplyr::mutate(n_level= n_distinct(label_fill), numeric_level= as.numeric(label_x) ) %>% as.data.frame()
   
 
+  # Calculate Percentage Change in Forest Loss (Delta)
+  delta_summary_forest<- {
+    data_delta<-  dataplot_forest %>% dplyr::filter(!fd %in% "control_pre")
+    denominador<- max( data_delta$forest_prop_loss )
+    numerador<- min( data_delta$forest_prop_loss )
+    delta <- (1-(numerador / denominador)) *100
+    type<- data_delta %>% split(.$label_fill)
+    sentido<- ifelse(  type$Treatment$forest_prop_loss >= type$`Control posMatching`$forest_prop_loss, "red", "darkgreen" )
+    data.frame(label_x= type_gov, delta= delta, color= sentido)
+  }
+  
+  
+  # Annotation for Delta in Forest Loss on the Forest Summary Plot
+  forest_summary_sign_plot<-  plot_forest_sign + 
+    geom_text(x=2.5, y= y_pos, label= paste0(round(delta_summary_forest$delta, 0), "%"), size= 4, vjust= -2.5, color= delta_summary_forest$color)
+  
+  # Create Combined Plot for Carbon Emissions and Forest Loss
+  forest_carbon_summary_sign_plot<-   plot_forest_sign+ ggnewscale::new_scale_fill()+
+    geom_errorbarh(data= dataplot_carbon_bars,
+                   aes(x= label_x, 
+                       xmin= dplyr::if_else(n_level > 1, numeric_level - 0.4, numeric_level - 0.2) , 
+                       xmax= dplyr::if_else(n_level > 1, numeric_level + 0.4, numeric_level + 0.2), y= sum_carbon_prop_loss, group = label_fill, color= color_bar_carbon_summary  ),
+                   height= height_bar_carbon_summary, position = position_dodge(0.9, preserve = 'total'), stat="identity", size= size_bar_carbon_summary, alpha= alpha_bar_carbon_summary )+
+    geom_point(data= dataplot_carbon_bars,
+               aes(x= label_x, y= sum_carbon_prop_loss,  group= label_fill, color= color_bar_carbon_summary ), alpha=alpha_bar_carbon_summary,
+               position =  position_dodge(0.9, preserve = 'total') , size= size_point_carbon_summary, shape = 18 )  +
+    scale_color_manual("", labels = legend_label_carbon_summary, values =  color_bar_carbon_summary )  +
+    scale_y_continuous(sec.axis = sec_axis(~., name = y_secondaxis_carbon_summary ), limits = ylimits_forest_summary )+
+    annotate(geom="text", x= 2.5, y= y_pos, label= paste0(round(delta_summary_forest$delta, 0), "%"), size= 4, vjust= -2.5, color= delta_summary_forest$color)
+  forest_carbon_summary_sign_plot
+  
+  
 ##  Plotting carbon disperssion estimations
   # Define the colors and labels for the plotting
   
@@ -748,11 +826,10 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
     data.frame(level= "loss", label_x = "Forest 2021- Forest 2000")) %>% 
     rbind.fill()
   
-  y_axis_title_result_carbon_disperssion<- "Carbon loss by pixel"
+  y_axis_title_result_carbon_disperssion<- expression(Tons~of~CO[2]~" by pixel")
   x_axis_title_result_carbon_disperssion<- "Forest Over Time"
   legend_title_result_carbon_disperssion<- ""
   plot_title_result_carbon_disperssion<- paste("Carbon ", type_gov)
-  limits_axis_y<- boxplot.stats(dataplot_carbon_disperssion$value)$stats %>% {c(min(.), max(.))}
   
   # Organize data
   dataplot_carbon_disperssion <- list(dispersion_pre_carbon_effect, 
@@ -764,6 +841,7 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
                   label_fill= factor(label_fill, unique(guide_fill_carbon_disperssion$label_fill))
                   )
   
+  limits_axis_y<- boxplot.stats(dataplot_carbon_disperssion$value)$stats %>% {c(min(.), max(.))}
   dataplot_carbon_disperssion_t1_t2<- dplyr::filter(dataplot_carbon_disperssion, !level %in% "loss")
   dataplot_carbon_disperssion_loss<- dplyr::filter(dataplot_carbon_disperssion, level %in% "loss")
   
@@ -806,12 +884,151 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
   
   
   # Display the final compiled disperssion carbon plot
-  plot_carbon_final<- ggarrange(plotlist = list(plot_carbon, plot_loss_carbon,
+  plot_carbon_final<- ggarrange(plotlist = list(
+                                                plot_carbon,
+                                                plot_loss_carbon_fin,
                                              plot_carbon_disperssion_t1_t2, 
                                              plot_carbon_disperssion_loss),
                                       common.legend = T, legend = "bottom", nrow = 2, ncol=2 )
 
   plot_carbon_final
+  
+  
+  
+  
+  
+  ##  Plotting supplementary information
+  
+  # Load supplementary data
+  file_supplementary<- file.path(input,   "supplementary_data_example.xlsx")
+  file_sheets <- openxlsx::getSheetNames(file_supplementary) 
+  list_supplementary<- lapply(file_sheets, function(x) { openxlsx::read.xlsx(file_supplementary, x) }) %>% setNames(file_sheets)
+  list_supplementary_data<- list_supplementary[!names(list_supplementary) %in% "Area"]
+  
+  data_supplementary<- pblapply(names(list_supplementary_data), function(i){
+    data_gov <- list_supplementary_data[[i]] %>%  melt(id.vars = "Year", variable.name = "Gov_type", value.name = "value") %>% 
+      dplyr::filter(!is.na(value)) %>% dplyr::mutate(Data_type= i)
+  }) %>% plyr::rbind.fill()
+  
+  # Set up graphical parameters for supplementary figures
+  # Base Parameters
+  x_axis_title_supplementary<- "Year"
+  xaxix_angle_supplementary<- 0
+  yaxix_angle_supplementary<- 0
+  legend_title_supplementary<- "Governance\ntype"
+  legend_CO2_supplementary<- c(expression(CO[2]))
+  size_text_supplementary<- 10
+  legend_CO2_type_gov<- c(expression(CO[2]~"loss (%)"))
+
+  
+  #### Specifies custom theme, color and label settings 
+  guide_fill_supplementary <- data.frame(Gov_type= "type_gov", vertical_title= "type_gov", color_fill= "#8D8D8D") %>% 
+    list(dplyr::mutate(list_supplementary$Area)) %>% plyr::join_all() %>% dplyr::mutate(label_fill= paste0(vertical_title, " (", Area, ")"))
+  ylimits_supplementary <- data.frame(Gov_type= "type_gov", vertical_title= "type_gov", color_fill= "#8D8D8D",  ymincol1= NA, ymaxcol1= NA, ymincol2= NA, ymaxcol2= NA, ymincol3= NA, ymaxcol3= NA) %>% 
+    list(guide_fill_supplementary) %>% plyr::join_all()
+  ylimits_type_gov<- ylimits_supplementary
+  
+
+  theme_supplementary<- function() { theme_minimal(base_size= size_text_supplementary) + theme(
+    legend.position = "bottom",
+    axis.ticks.x = element_line(color = "black", size = 0.5),
+    axis.ticks.y = element_line(color = "black", size = 0.5),
+    axis.text.x = element_text(angle = xaxix_angle_supplementary, vjust = 0.5),
+    axis.text.y = element_text(angle = yaxix_angle_supplementary, vjust = 0.5),
+    axis.line.y = element_line(color = "black"),
+    axis.line.x = element_line(color = "black")) }
+  
+  y_axis_titles_supplementary <- list(
+    data.frame(Data_type= "Forest", y_title = 'expression( "Forest Loss (" * km^2*")" )' ),
+    data.frame(Data_type= "ForestProportion", y_title = "Forest Loss (%)" ),
+    data.frame(Data_type= "ForestProportion_from2000", y_title = "Forest Loss\nProportional to 2000 (%)"),
+    data.frame(Data_type= "CarbonTonnes", y_title = 'expression("Tonnes of " ~CO[2]~"emissions")' ),
+    data.frame(Data_type= "CarbonProportion", y_title = 'expression(~CO[2]~"emissions (%)")' ),
+    data.frame(Data_type= "CarbonProportion_from2000", y_title = 'expression(atop(CO[2] ~ "emissions", "proportional to 2000 (%)"))' )
+  ) %>% rbind.fill() 
+  
+  
+  # Organize data for visualization
+  supplementary_dataplot<- data_supplementary %>% 
+    list(guide_fill_supplementary, y_axis_titles_supplementary) %>% plyr::join_all()  %>% 
+    dplyr::mutate(label_fill= factor(label_fill, unique(guide_fill_supplementary$label_fill)),
+                  Gov_type= factor(Gov_type, unique(guide_fill_supplementary$Gov_type)),
+                  Data_type= factor(Data_type, unique(y_axis_titles_supplementary$Data_type))) %>% 
+    dplyr::filter(Year>=2000)   %>% dplyr::filter(!is.na(Gov_type)) %>% dplyr::filter(!is.na(Data_type))
+  
+  
+  type_gov_forest_dataplot<- supplementary_dataplot %>% dplyr::filter(grepl("Forest", Data_type))
+  type_gov_carbon_dataplot<- supplementary_dataplot %>% dplyr::filter(grepl("Carbon", Data_type)) 
+  
+  list_type_gov_forest_dataplot<- type_gov_forest_dataplot %>% split(.$Data_type) %>% {Filter(function(x) nrow(x)>0, .)}
+  list_type_gov_carbon_dataplot<- type_gov_carbon_dataplot %>% split(.$Data_type) %>% {Filter(function(x) nrow(x)>0, .)}
+  
+
+  
+  #### Generar plot completo
+  list_type_gov_plot<- pblapply(seq_along(list_type_gov_forest_dataplot), function(i){ print(i)
+    
+    
+    grid_forest_dataplot<- list_type_gov_forest_dataplot[[i]]
+    grid_carbon_dataplot<- list_type_gov_carbon_dataplot[[i]]
+    
+    range_grid_forest<- grid_forest_dataplot$value %>% {c(min(.), max(.))}
+    range_grid_carbon<- grid_carbon_dataplot$value %>% {c(min(.), max(.))}
+    
+    grid_carbon_dataplot2<- grid_carbon_dataplot %>% dplyr::mutate(value2= scales::rescale(value, to = range_grid_forest ), Data_type= unique(grid_forest_dataplot$Data_type) )
+    
+    ygrid_lab<- unique(grid_forest_dataplot$y_title)  %>% {tryCatch(eval(parse(text = .)), error=  function(e){.})}
+    ygrid_secondlab<- unique(grid_carbon_dataplot$y_title) %>% {tryCatch(eval(parse(text = .)), error=  function(e){.})}
+    
+    grid_ylimits<- lapply(ylimits_supplementary[, paste0(c("ymincol", "ymaxcol"), i)] %>% split(seq(nrow(.))), function(x) {
+      scale_y_continuous(limits = unlist(x), sec.axis = sec_axis(~ scales::rescale(., from= range_grid_forest, to = range_grid_carbon), name = ygrid_secondlab))  })
+    
+    
+    
+
+    grid_plot<- ggplot() +
+      geom_bar(data= grid_forest_dataplot, aes(x = Year, y = value, fill= label_fill),
+               stat = "identity", position = position_dodge2(preserve= "single", width=1), drop= T) +
+      geom_line(data= grid_carbon_dataplot2, aes(x = Year, y = value2, color= "red"), size= 0.5) +
+      geom_point(data= grid_carbon_dataplot2, aes(x = Year, y = value2, color= "red"), size= 0.5)  +
+      scale_color_manual("", labels = legend_CO2_type_gov, values = c("red")) +
+      scale_fill_manual( legend_title_supplementary, drop= F, values = setNames(guide_fill_supplementary$color_fill ,guide_fill_supplementary$label_fill))+
+      guides(fill = guide_legend(order = 1), color = guide_legend(order = 2))+
+      facet_grid2(Gov_type~Data_type, axes = "all", scales = "free",  independent = "all")+
+      ylab(  ygrid_lab    )+ xlab("") +
+      theme_supplementary()+theme(strip.text = element_blank())+
+      ggh4x::facetted_pos_scales(y = grid_ylimits)
+    
+    
+  })
+  
+  
+  list_type_gov_plot[[2]]<- list_type_gov_plot[[2]] + xlab(x_axis_title_supplementary)
+  
+  vertical_titles_type_govplot<-  ggarrange(plotlist = lapply( unique(guide_fill_supplementary$vertical_title) , function(x)
+  {ggplot() +  annotate("text", x = 0, y = 0.1, label = x, angle = 90, vjust = 1, size= 3)+ theme_void() + theme(axis.title.x = element_text())+xlab("")   }), ncol = 1)
+  
+  complete_type_gov_plot<- ggarrange(plotlist = list_type_gov_plot, nrow   = 1,legend=  "bottom", common.legend = T) 
+  
+  
+ 
+  
+  
+  
+  
+  
+  
+
+  
+  
+  
+  
+  ## exportar las resultados
+  dir_out<- file.path(dir_work, "simple_example", "output")
+  
+  
+  
+  
   
   
   
