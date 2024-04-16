@@ -1,37 +1,12 @@
 Matching Counterfactual Forest
 ================
-Rincon-Parra VJNegret PabloForero-Medina German
 
-Methodology for analyzing deforestation using a counterfactual approach
-that compares areas with special management against unmanaged areas,
-through the estimation of equivalent zones based on similarities in
-covariates.
+This is the script for the assessment of  the impact of different governance mechanisms on forest loss and its associated carbon emissions in the Peruvian Amazon from 2000 to 202 done for the article “Potential of different governance mechanisms for achieving Global Biodiversity Framework goals” (Negret et al. 2024). The study evaluates the effectiveness of protected areas (PAs) and potential OECMs, particularly Indigenous Lands and Non-Timber Forest Products Concessions, in the Peruvian Amazon from 2000 to 2021. It uses a robust before-after control intervention design with statistical matching to account for non-random deforestation pressures and governance types. 
 
-This document explores the use of a Counterfactual tool designed for
-assessing the impact of conservation efforts through statistical
-matching. Counterfactual thinking is crucial for measuring the real
-impact of conservation initiatives. By comparing what has happened with
-what could have happened without the intervention, researchers can
-isolate the effects of conservation efforts from other environmental
-changes.
+The input of the script is a data table where the rows represent pixels and the columns represent covariates. You must include a column that indicates the type of governance or management area, using 1s and 0s.
 
-The input of the script is a data table where the rows represent pixels
-and the columns represent covariates. You must include a column that
-indicates the type of governance or management area, using 1s and 0s.
-
-The analysis is part of a workflow for a study published in the paper
-titled “Potential of different governance mechanisms for achieving
-Global Biodiversity Framework goals” (Negret et al. 2024). The study
-evaluates the effectiveness of protected areas (PAs) and potential
-OECMs, such as Indigenous Lands and Non-Timber Forest Products
-Concessions, in the Peruvian Amazon from 2000 to 2021. It uses a robust
-before-after control intervention design with statistical matching to
-account for non-random deforestation pressures and governance types. The
-findings show that PAs were most effective, reducing expected forest
-loss significantly, followed by other governance mechanisms, with
-varying impacts on forest cover and carbon emissions. This evidence
-supports the effectiveness of these mechanisms in forest conservation
-and achieving biodiversity and climate change targets.
+Link to the article;
+https://www.researchsquare.com/article/rs-4170734/v1
 
 # Load libraries
 
@@ -719,6 +694,13 @@ posmatchversusplot <- ggplot(data = includedListposmatching[["0"]]) +
 summ_matching_propension_plot <- ggpubr::ggarrange(plotlist = list(PreMatchversusplot, posmatchversusplot), common.legend = T, legend = "bottom")
 ```
 
+``` r
+print(summ_matching_propension_plot)
+```
+
+![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-43-8.png)<!-- -->
+
+
 # Analysis post-matching
 
 From this point onwards, response variables from the matched groups can
@@ -1161,35 +1143,11 @@ print(plot_loss_carbon_fin)
 
 ![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-49-1.png)<!-- -->
 
-``` r
- # plot the proportion of carbon loss  with significance annotations
-  plot_loss_carbon_sign <- ggplot(data= dataplot_carbon,  aes(x= label_x, y= sum_carbon_prop_loss , fill= label_fill))+
-    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                  width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-    geom_signif(position="identity",  textsize = 5, comparisons=list(c("Control posMatching","Treatment")) ,annotations = dataplot_carbon$sign_forest_2000_2021[1])+
-    xlab(x_axis_title_result_carbon)+ylab(y_axis_title_result_carbon)+
-    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
-    scale_fill_manual(legend_title_result_carbon,  values = setNames(guide_fill_carbon$color_fill ,guide_fill_carbon$label_fill) )+
-    theme_minimal()+
-    theme(legend.position = "bottom",
-          axis.text.x  = element_blank(),
-          axis.line.y = element_line(color = "black"),
-          axis.line.x = element_line(color = "black"))
-  
-  plot_loss_carbon_sign
-```
-
-``` r
-print(plot_loss_carbon_sign)
-```
-
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-51-1.png)<!-- -->
 
 ``` r
   # Arrange the forest and carbon loss plots into a single figure
   plot_response_sign <- ggpubr::ggarrange(
-    plotlist = list(plot_forest_sign, plot_loss_carbon_sign),  # List of plots to arrange
+    plotlist = list(plot_forest_sign, plot_loss_carbon),  # List of plots to arrange
     common.legend = TRUE,  # Use a single common legend for all plots
     legend = "bottom"  # Position the legend at the bottom of the arranged figure
   )
