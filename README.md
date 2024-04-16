@@ -1141,7 +1141,7 @@ print(summary_carbon)
 print(plot_loss_carbon_fin)
 ```
 
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-49-1.png)<!-- -->
+![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-51-1.png)<!-- -->
 
 
 ``` r
