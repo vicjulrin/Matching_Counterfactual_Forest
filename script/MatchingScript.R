@@ -24,7 +24,7 @@ output<- file.path(dirname(dir_work), "output")
 # Load data. The data should be a table where rows correspond to spatial units (e.g., pixels) and columns represent variables.
 # Each spatial unit (row) will serve as the input for the matching process, which will be performed based on the similarity between covars (columns)
 setwd(input)
-data<- read.csv("data.csv", header = T)
+data<- readRDS("data2.rds")
 
 
 names(data)
@@ -32,8 +32,12 @@ head(data)
 
 # Specify the column name in data that defines spatial units in relation to governance type. 
 # This column indicates which spatial units are associated with a type of governance (1) and which are not (0).
-type_gov<- "Type"
+type_gov<- "MC"
 table(data[,type_gov])
+
+# Remove missing values
+data<- data[!is.na(data[,type_gov]),]
+
 
 # List preliminary covariates-columns in data to estimate similarity for matching.
 # These are considered preliminary as they will undergo multicollinearity tests and significance checks in relation to governance type.
@@ -198,11 +202,7 @@ PreMatchingIndexDataV2
 # Performs matching based on the specified criteria to balance the treatment and control groups, enhancing the validity of causal inferences. 
 # The 'formula_glm' defines the treatment indicator and covariates for matching, 'method = "nearest"' specifies nearest neighbor matching to pair individuals based on similarity in propensity scores, and 'ratio = 1' ensures a 1:1 match between treated and untreated units, aiming for the closest match possible without replacement.
 
-m.nn <- matchit(MC ~ Ecoregions + National_R + Tra_Time00 + Dis_Def + D7Set10000 + 
-                  Department + D7Set1000 + Slope + Dis_Rivers + Pop2000 + Departme_R + 
-                  District_R + D7Set10 + D17Set5000 + D7Set5000 + D17Set10 + 
-                  Elevation + Anual_Prec + Prec_Seas, data =data, method= "nearest", ratio = 1)
-
+m.nn <- matchit(formula_glm, data =data, method= "nearest", ratio = 1)
 
 
 
@@ -210,6 +210,7 @@ m.nn <- matchit(MC ~ Ecoregions + National_R + Tra_Time00 + Dis_Def + D7Set10000
 
 # Extracts the matched dataset and calculates the deforestation indicator. 'deforest' is defined as 1 if the forest status changed from present ('Fores_2000' == 1) to absent ('Fores_2021' == 0) over the study period, and 0 otherwise. This step prepares the data for subsequent analysis of treatment effects on deforestation.
 y=match.data(m.nn, group="all")
+
 
 # Propensity scores calculation. 
 treated1 <-(y[, type_gov]==1)
@@ -325,6 +326,9 @@ group2 <- match(matches[, 1], row.names(y))
 
 
 
+
+
+
 # Estimate forest and carbon trends ####
 
 ########### Forests effect
@@ -342,6 +346,9 @@ carbon_yC<- y$Carbon_pixel[group2]
 
 ## summ match  
 matched.cases_forest <- cbind(matches, forest_yT2000, forest_yT2021, forest_yC2000, forest_yC2021, carbon_yt, carbon_yC)
+
+
+
 
 
 ## Organize control data ####
@@ -364,6 +371,7 @@ Prop_forest_control_pre= 100-Prop_noloss_forest_control_pre
 # The DescTools::BinomCI function computes confidence intervals for binomial proportions, providing a range of values within which the true proportion is likely to lie.https://rdrr.io/cran/DescTools/man/BinomCI.html
 binomial_test_control_pre<- 100* (1 - DescTools::BinomCI(x= control_pre_forest_2021, n= length(Control$Fores_2000), 
                                                            conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
+
 lower_def_control_pre<- min(binomial_test_control_pre[c("lwr.ci", "upr.ci")])
 upper_def_control_pre<- max(binomial_test_control_pre[c("lwr.ci", "upr.ci")])
     
@@ -371,8 +379,11 @@ upper_def_control_pre<- max(binomial_test_control_pre[c("lwr.ci", "upr.ci")])
 control_pos_forest_2020 = sum(matched.cases_forest$forest_yC2000)
 control_pos_forest_2021 = sum(matched.cases_forest$forest_yC2021)
 
+
+
 # Calculate the proportion of forest pixels that remained unchanged in the control group pos-matching.
 Prop_noloss_forest_control_pos= (control_pos_forest_2021/control_pos_forest_2020)*100
+
 
 # Calculate the proportion of forest loss in the control group pos-matching.
 Prop_forest_control_pos= 100-Prop_noloss_forest_control_pos
@@ -411,33 +422,23 @@ upper_def_treat<- max(binomial_test_treat[c("lwr.ci", "upr.ci")])
 ## Estimation of treatment significance - governance type ####
 # Model to assess changes in forest status from 2000 to 2021 as a function of governance type and selected variables.
 
-sign_form_treatment<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov, "+"), paste(selected_variables, collapse= "+")))
-  
-# Fit a glm to the matched data to evaluate the effect of governance and other covariates on forest status.
-Model_M_forest = glm( sign_form_treatment , data = y ,family = binomial)
-Model_M_forest_deviance<- deviance(Model_M_forest)
-Model_M_forest_AIC<- extractAIC(Model_M_forest)[2]
-Model_M_forest_sum<- summary(Model_M_forest)
-  
 # Fit a model focused on forest changes from 2000 to 2021 as influenced by governance type alone, simplifying the influence of other variables.
-formula_forest2000_2021<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov)))
-Model_M_forest_2000_2021 = glm(formula_forest2000_2021, data = y ,family = binomial)
+formula_M_forest_2000_2021<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov)))
+Model_M_forest_2000_2021 = glm(formula_M_forest_2000_2021, data = y ,family = binomial)
 Model_M_forest_2000_2021_deviance<- deviance(Model_M_forest_2000_2021)
 Model_M_forest_2000_2021_AIC<- extractAIC(Model_M_forest_2000_2021)[2]
 Model_M_forest_2000_2021_sum <- summary(Model_M_forest_2000_2021)
 sign_Model_M_forest_2000_2021_sum<- Model_M_forest_2000_2021_sum$coefficients[2,4]
 
-# Analyze the impact of governance on the deforestation rate, examining if governance influences the likelihood of deforestation.
-y<- y %>%  dplyr::mutate(deforest= dplyr::if_else(Fores_2000 ==1 & Fores_2021 == 0, 1, 0))
-formula_deforest2000_2021<- as.formula(  paste0("deforest ~", type_gov) )
-  Model_M_deforest_2000_2021 = glm(formula_deforest2000_2021, data = y ,family = binomial)
-  Model_M_deforest_2000_2021_deviance<- deviance(Model_M_deforest_2000_2021)
-  Model_M_deforest_2000_2021_AIC<- extractAIC(Model_M_deforest_2000_2021)[2]
-  Model_M_deforest_2000_2021_sum <- summary(Model_M_deforest_2000_2021)
-  sign_Model_M_deforest_2000_2021_sum<- Model_M_deforest_2000_2021_sum$coefficients[2,4]
-  
+# Fit a glm to the matched data to evaluate the effect of governance and other covariates on forest status.
+formula_M_forest_covs<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov, "+"), paste(selected_variables, collapse= "+")))
+Model_M_forest_covs = glm( formula_M_forest_covs , data = y ,family = binomial)
+Model_M_forest_covs_deviance<- deviance(Model_M_forest_covs)
+Model_M_forest_covs_AIC<- extractAIC(Model_M_forest_covs)[2]
+Model_M_forest_covs_sum<- summary(Model_M_forest_covs)
+sign_Model_M_forest_covs_sum<- Model_M_forest_covs_sum$coefficients[2,4]
 
-sign_form_treatment; formula_forest2000_2021; formula_deforest2000_2021
+formula_M_forest_2000_2021; formula_M_forest_covs; 
   
 # Organize forest analysis data
 # This table summarizes forest data for treatment and control groups pre- and post-matching, detailing forest loss, non-loss proportions, their confidence intervals, and statistical significance
@@ -448,14 +449,12 @@ summary_forest<- data.frame(fd= c("treatment", "control_pre", "control_pos"),
                               forest_prop_loss= c(Prop_forest_treatment , Prop_forest_control_pre, Prop_forest_control_pos),
                               low_interval= c(lower_def_treat, lower_def_control_pre, lower_def_control_pos ), 
                               upper_interval= c(upper_def_treat, upper_def_control_pre, upper_def_control_pos ),
-                              zval_forest_2000_2021 = c(sign_Model_M_forest_2000_2021_sum, NA, NA),
-                              zval_deforest_2000_2021 = c(sign_Model_M_deforest_2000_2021_sum, NA, NA)  ) %>% 
+                              zval_M_forest_2000_2021 = c(sign_Model_M_forest_2000_2021_sum, NA, NA)  ) %>% 
     dplyr::mutate(type= type_gov, fd= factor(fd, levels=  c("treatment", "control_pos", "control_pre"))) %>% 
-      dplyr::mutate(sign_forest_2000_2021= sapply(.$zval_forest_2000_2021, function(x) {
-      if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"} else {""} })  ) %>% 
-    dplyr::mutate(sign_deforest_2000_2021= sapply(.$zval_deforest_2000_2021, function(x) {
-      if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"}  else {""} } )  )
-  
+      dplyr::mutate(sign_forest_2000_2021= sapply(.$zval_M_forest_2000_2021, function(x) {
+      if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"} else {""} })  )
+
+
 
 # Plotting forest estimations
 # Define the colors and labels for the plotting
@@ -648,14 +647,8 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
                               mean_carbon_t2= c(mean_treatment_pos_carbon_2021, mean_control_pos_carbon_2021 , mean_control_pre_carbon_2021),
                               mean_pixel = c(mean_treatment_pos_carbon, mean_pos_carbon, mean_pre_carbon),
                               low_interval= c(lower_losscarb_treatment_pos, lower_losscarb_control_pos, lower_losscarb_control_pre), 
-                              upper_interval= c(upper_losscarb_treatment_pos, upper_losscarb_control_pos, upper_losscarb_control_pre),
-                              zval_forest_2000_2021 = c(sign_Model_M_forest_2000_2021_sum, NA, NA),
-                              zval_deforest_2000_2021 = c(sign_Model_M_deforest_2000_2021_sum, NA, NA)  ) %>%                         
-    dplyr::mutate(type= type_gov, fd= factor(fd, levels=  c("treatment", "control_pos", "control_pre"))) %>% 
-    dplyr::mutate(sign_forest_2000_2021= sapply(.$zval_forest_2000_2021, function(x) {
-      if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"} else {""} })  ) %>% 
-    dplyr::mutate(sign_deforest_2000_2021= sapply(.$zval_deforest_2000_2021, function(x) {
-      if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"}  else {""} } )  )
+                              upper_interval= c(upper_losscarb_treatment_pos, upper_losscarb_control_pos, upper_losscarb_control_pre)
+                              )
   
   # Plotting carbon estimations
   # Define the colors and labels for the plotting
@@ -665,22 +658,18 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
     data.frame(fd= "treatment", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
   ) %>% rbind.fill()
   
+
+  
   guide_xaxis_carbon <- list(
-    data.frame(fd= "control_pre", label_x= "Control preMatching"),
-    data.frame(fd= "control_pos", label_x= "Control posMatching"),
-    data.frame(fd= "treatment", label_x = "Treatment")
+    data.frame(level= "mean_carbon_t1", label_x= "Forests 2000"),
+    data.frame(level= "mean_carbon_t2", label_x= "Forests 2021")
   ) %>% rbind.fill()
+  
   
   y_axis_title_result_carbon<- c(expression(CO[2]~"emissions (%)"))
   x_axis_title_result_carbon<- type_gov
   legend_title_result_carbon<- ""
   plot_title_result_carbon<- paste("Carbon", type_gov)
-  
-  dataplot_carbon<- summary_carbon %>%
-    dplyr::mutate(fd= factor( fd, levels = unique(.$fd) )) %>% 
-    list(guide_fill_carbon, guide_xaxis_carbon) %>% plyr::join_all() %>% 
-    dplyr::mutate( label_fill= factor(label_fill, unique(guide_fill_carbon$label_fill)),
-                   label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x)) )
   
 
   data_plot_carbon<-   melt(data.table(summary_carbon)[,c("fd", "mean_carbon_t1", "mean_carbon_t2")], 
@@ -692,23 +681,14 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
       label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x))
     )
   
-  data_sum_plot_carbon<- melt(data.table(summary_carbon)[,c("fd", "sum_carbon_t1", "sum_carbon_t2")], 
-                              id.vars = "fd", variable.name = "level", 
-                              value.name = "sum_carbon") %>% dplyr::mutate(level= gsub("sum_", "mean_",level)) %>% 
-    list(data_plot_carbon) %>% join_all()
-  
-  
-  
+
   # plot the proportion of carbon loss 
-  
   y_axis_title_result_carbon_mean<- "Mean Carbon loss by pixel"
 
-  plot_carbon<- ggplot()+geom_bar(data= data_plot_carbon,  aes(x= label_x , y= value*100 , fill= label_fill), stat = "identity",
-                                  width = 0.4, size= 0.1, position = position_dodge(width  = .8) )+
+  plot_carbon<-  ggplot()+geom_bar(data= data_plot_carbon,  aes(x= label_x , y= value*100 , fill= label_fill), stat = "identity",
+                                  width = 0.4, size= 0.1, position = position_dodge(width  = .8) ) +
     xlab("")+ylab(y_axis_title_result_carbon_mean)+
-    scale_fill_manual("",
-                      values = setNames(guide_fill_carbon$color_fill ,
-                                        guide_fill_carbon$label_fill) )  +
+    scale_fill_manual("", values = setNames(guide_fill_carbon$color_fill , guide_fill_carbon$label_fill) )  +
     theme_minimal()+
     theme(
       axis.text.x = element_blank(),
@@ -784,6 +764,7 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
     data_delta<-  dataplot_forest %>% dplyr::filter(!fd %in% "control_pre")
     denominador<- max( data_delta$forest_prop_loss )
     numerador<- min( data_delta$forest_prop_loss )
+
     delta <- (1-(numerador / denominador)) *100
     type<- data_delta %>% split(.$label_fill)
     sentido<- ifelse(  type$Treatment$forest_prop_loss >= type$`Control posMatching`$forest_prop_loss, "red", "darkgreen" )
@@ -847,9 +828,6 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
   
   # plot the disperssion of carbon by pixel between two periods
   plot_carbon_disperssion_t1_t2<- ggplot(dataplot_carbon_disperssion_t1_t2, aes(x = label_x, y = value, fill= label_fill)) +
-    stat_slab(side = "right", scale = 0.4,show.legend = T,expand = F, 
-              position = position_dodge(width = .8), aes(fill_ramp = stat(level) ), 
-              .width = c(.50, .95)  ) +
     geom_boxplot(width = 0.2, outlier.alpha=0, size= 0.1, 
                  position = position_dodge(width  = .8),show.legend = FALSE)+
     scale_fill_manual(legend_title_result_carbon_disperssion, values = setNames(guide_fill_carbon_disperssion$color_fill,
@@ -865,9 +843,6 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
 
   # plot for carbon loss dispersion pixels
   plot_carbon_disperssion_loss<- ggplot(dataplot_carbon_disperssion_loss, aes(x = label_x, y = value, fill= label_fill)) +
-    stat_slab(side = "right", scale = 0.4,show.legend = T,expand = F, 
-              position = position_dodge(width = .8), aes(fill_ramp = stat(level) ), 
-              .width = c(.50, .95)  ) +
     geom_boxplot(width = 0.2, outlier.alpha=0, size= 0.1, 
                  position = position_dodge(width  = .8),show.legend = FALSE)+
     scale_fill_manual(legend_title_result_carbon_disperssion, values = setNames(guide_fill_carbon_disperssion$color_fill,
@@ -875,27 +850,25 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
                       )+
     guides(fill_ramp = "none")  +
     scale_y_continuous(limits= limits_axis_y)+
-    labs(x = "Carbon loss", y = " ")+
+    labs(x = "Carbon loss", y = expression("Delta Time"~ Tons~of~CO[2]~" by pixel") )+
     theme_minimal()+
     theme(
       axis.text.y = element_text(angle = 90, hjust = 1),
           axis.line.y = element_line(color = "black"),
           axis.line.x = element_line(color = "black"))
   
+
+  
   
   # Display the final compiled disperssion carbon plot
   plot_carbon_final<- ggarrange(plotlist = list(
                                                 plot_carbon,
-                                                plot_loss_carbon_fin,
+                                                plot_loss_carbon_fin+theme(axis.text.x = element_blank(),axis.title.x = element_blank()),
                                              plot_carbon_disperssion_t1_t2, 
                                              plot_carbon_disperssion_loss),
                                       common.legend = T, legend = "bottom", nrow = 2, ncol=2 )
 
   plot_carbon_final
-  
-  
-  
-  
   
   ##  Plotting supplementary information
   
@@ -1009,22 +982,6 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
   {ggplot() +  annotate("text", x = 0, y = 0.1, label = x, angle = 90, vjust = 1, size= 3)+ theme_void() + theme(axis.title.x = element_text())+xlab("")   }), ncol = 1)
   
   complete_type_gov_plot<- ggarrange(plotlist = list_type_gov_plot, nrow   = 1,legend=  "bottom", common.legend = T) 
-  
-  
- 
-  
-  
-  
-  
-  
-  
-
-  
-  
-  
-  
-  ## exportar las resultados
-  dir_out<- file.path(dir_work, "simple_example", "output")
   
   
   

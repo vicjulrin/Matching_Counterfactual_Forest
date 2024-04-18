@@ -1,122 +1,108 @@
-Matching Counterfactual Forest
-================
+This is the script for the assessment of the impact of different
+governance mechanisms on forest loss and its associated carbon emissions
+in the Peruvian Amazon from 2000 to 2021 done for the article “Potential
+of different governance mechanisms for achieving Global Biodiversity
+Framework goals” (Negret et al. 2024). The study evaluates the
+effectiveness of protected areas (PAs) and potential OECMs, particularly
+Indigenous Lands and Non-Timber Forest Products Concessions, in the
+Peruvian Amazon from 2000 to 2021. It uses a robust before-after control
+intervention design with statistical matching to account for non-random
+deforestation pressures and governance types.
 
-This is the script for the assessment of  the impact of different governance mechanisms on forest loss and its associated carbon emissions in the Peruvian Amazon from 2000 to 2021 done for the article “Potential of different governance mechanisms for achieving Global Biodiversity Framework goals” (Negret et al. 2024). The study evaluates the effectiveness of protected areas (PAs) and potential OECMs, particularly Indigenous Lands and Non-Timber Forest Products Concessions, in the Peruvian Amazon from 2000 to 2021. It uses a robust before-after control intervention design with statistical matching to account for non-random deforestation pressures and governance types. 
-
-The input of the script is a data table where the rows represent pixels and the columns represent covariates. You must include a column that indicates the type of governance or management area, using 1s and 0s.
+The input of the script is a data table where the rows represent pixels
+and the columns represent covariates. You must include a column that
+indicates the type of governance or management area, using 1s and 0s.
 
 Link to the article;
-https://www.researchsquare.com/article/rs-4170734/v1
+<https://www.researchsquare.com/article/rs-4170734/v1>
 
 # Load libraries
 
-``` r
-# List necessary packages
-packages_list<-list("magrittr", "dplyr", "plyr", "MatchIt", "RItools", "Hmisc", "this.path", "scales", "ggdendro", "data.table", "openxlsx",
-                    "tibble", "leaps", "pbapply", "RColorBrewer", "ggpubr", "ggdist", "ggh4x")
+    # List necessary packages
+    packages_list<-list("magrittr", "dplyr", "plyr", "MatchIt", "RItools", "Hmisc", "this.path", "scales", "ggdendro", "data.table", "openxlsx",
+                        "tibble", "leaps", "pbapply", "RColorBrewer", "ggpubr", "ggdist", "ggh4x")
 
-# Install necessary packages not installed
-packagesPrev<- .packages(all.available = TRUE)
-lapply(packages_list, function(x) {   if ( ! x %in% packagesPrev ) { install.packages(x, force=T)}    })
+    # Install necessary packages not installed
+    packagesPrev<- .packages(all.available = TRUE)
+    lapply(packages_list, function(x) {   if ( ! x %in% packagesPrev ) { install.packages(x, force=T)}    })
 
-# Load libraries
-lapply(packages_list, library, character.only = TRUE)
-```
+    # Load libraries
+    lapply(packages_list, library, character.only = TRUE)
 
-``` r
-packages_list<-list("magrittr", "dplyr", "plyr", "ggplot2")
-lapply(packages_list, library, character.only = TRUE)
-```
+    packages_list<-list("magrittr", "dplyr", "plyr", "ggplot2")
+    lapply(packages_list, library, character.only = TRUE)
 
 # Define workspace
 
-``` r
-# Set working directory
-# Uses 'this.path::this.path()' to find the path of the current R script and 'dirname()' to get its directory. This directory is set as the working directory where the current code is stored.
-dir_work<- this.path::this.path() %>% dirname()
+    # Set working directory
+    # Uses 'this.path::this.path()' to find the path of the current R script and 'dirname()' to get its directory. This directory is set as the working directory where the current code is stored.
+    dir_work<- this.path::this.path() %>% dirname()
 
-# Set input - output folder
-# Establishes paths for input and output directories relative to 'dir_work'. 'file.path()' constructs the path to the directories ensuring it is OS independent.
-input<- file.path(dirname(dir_work), "input")
-output<- file.path(dirname(dir_work), "output")
-```
+    # Set input - output folder
+    # Establishes paths for input and output directories relative to 'dir_work'. 'file.path()' constructs the path to the directories ensuring it is OS independent.
+    input<- file.path(dirname(dir_work), "input")
+    output<- file.path(dirname(dir_work), "output")
 
 # Load data
 
-``` r
-# Load data. The data should be a table where rows correspond to spatial units (e.g., pixels) and columns represent variables.
-# Each spatial unit (row) will serve as the input for the matching process, which will be performed based on the similarity between covars (columns)
-setwd(input)
-data<- read.csv("data.csv", header = T)
-```
+    # Load data. The data should be a table where rows correspond to spatial units (e.g., pixels) and columns represent variables.
+    # Each spatial unit (row) will serve as the input for the matching process, which will be performed based on the similarity between covars (columns)
+    setwd(input)
+    data<- read.csv("data.csv", header = T)
 
-``` r
-names(data)
-```
+    names(data)
 
-    ##  [1] "X.1"          "FID"          "CID"          "X"            "Y"           
-    ##  [6] "Type"         "PUID"         "Carbon"       "Department"   "Anual_Prec"  
-    ## [11] "Prec_Seas"    "Dis_Def"      "Dis_Rivers"   "District_R"   "Departme_R"  
-    ## [16] "National_R"   "D7Set10"      "D7Set1000"    "D7Set5000"    "D7Set10000"  
-    ## [21] "D17Set10"     "D17Set1000"   "D17Set5000"   "D17Set10000"  "Ecoregions"  
-    ## [26] "Elevation"    "Pop2000"      "Pop2020"      "Slope"        "Tra_Time00"  
-    ## [31] "Tra_Time15"   "Fores_2000"   "Fores_2005"   "Fores_2010"   "Fores_2021"  
-    ## [36] "PA"           "IL"           "CC"           "LC"           "MC"          
-    ## [41] "Carbon_pixel" "psvalue"
+    ##  [1] "X"            "Y"            "PUID"         "Carbon"       "Department"  
+    ##  [6] "Anual_Prec"   "Prec_Seas"    "Dis_Def"      "Dis_Rivers"   "District_R"  
+    ## [11] "Departme_R"   "National_R"   "D7Set10"      "D7Set1000"    "D7Set5000"   
+    ## [16] "D7Set10000"   "D17Set10"     "D17Set1000"   "D17Set5000"   "D17Set10000" 
+    ## [21] "Ecoregions"   "Elevation"    "Pop2000"      "Pop2020"      "Slope"       
+    ## [26] "Tra_Time00"   "Tra_Time15"   "Fores_2000"   "Fores_2005"   "Fores_2010"  
+    ## [31] "Fores_2021"   "Carbon_pixel" "id_rincon"    "PA"           "IL"          
+    ## [36] "CC"           "LC"           "MC"           "psvalue"
 
-``` r
-head(data)
-```
+    head(data)
 
-    ##   X.1 FID CID       X       Y Type   PUID   Carbon Department Anual_Prec
-    ## 1   1 335   0 1105751 8443292    1 149038 52.88590          8       2486
-    ## 2   2 340   0 1108463 8441966    1 149090 23.76750          8       2239
-    ## 3   3 351   0 1107703 8440151    1 149404 37.75690          8       2388
-    ## 4   4 360   0 1105832 8441130    1 149801 54.71670          8       2538
-    ## 5   5 379   0 1102617 8433531    1 150087  5.94987          8       1774
-    ## 6   6 388   0 1107531 8439304    1 150275 53.05250          8       2284
-    ##   Prec_Seas  Dis_Def Dis_Rivers District_R Departme_R National_R D7Set10
-    ## 1        53 324.5000    6829.60   12661.70    6430.51   17222.10 10786.7
-    ## 2        55 182.4830    7410.00    9654.59    6896.87   15998.20 11634.8
-    ## 3        54  60.0000    9355.77    9522.48    8846.54   14134.60 12882.7
-    ## 4        52 234.3070    8794.91   11615.30    8415.25   15061.10 10971.5
-    ## 5        61  84.8528   15216.20   14386.60   15230.00    8188.41 11930.5
-    ## 6        55 120.0000   10205.80    9432.84    9694.64   13281.60 12990.1
-    ##   D7Set1000 D7Set5000 D7Set10000 D17Set10 D17Set1000 D17Set5000 D17Set10000
-    ## 1   34787.8    159891     159891 3738.580    18691.2     146583      159891
-    ## 2   32044.3    160779     160779 2588.010    15672.9     149449      160779
-    ## 3   31405.2    162674     162674  939.149    15625.0     150193      162674
-    ## 4   32715.1    162004     162004 1740.260    17715.9     148183      162004
-    ## 5   24552.9    170075     170075 7530.720    19774.6     151555      170075
-    ## 6   31011.4    163532     163532  782.304    15523.4     150666      163532
-    ##   Ecoregions Elevation   Pop2000   Pop2020    Slope Tra_Time00 Tra_Time15
-    ## 1          8      1469 0.0262554 0.0357465  57.7410        770        685
-    ## 2          8      1977 0.0317090 0.0420932  41.6500        442        451
-    ## 3          8      1673 0.0351959 0.0333368  31.3803        485        508
-    ## 4          8      1397 0.0307703 0.0363957  49.6271        639        607
-    ## 5          8      2522 0.0449926 0.0193342 120.7510        205        707
-    ## 6          8      1768 0.0378849 0.0231144  37.7905        462        508
-    ##   Fores_2000 Fores_2005 Fores_2010 Fores_2021 PA IL CC LC MC Carbon_pixel
-    ## 1          1          1          1          1  0  0  0  0  1    4.7597309
-    ## 2          1          1          1          1  0  0  0  0  1    2.1390750
-    ## 3          1          1          1          1  0  0  0  0  1    3.3981211
-    ## 4          1          1          1          1  0  0  0  0  1    4.9245031
-    ## 5          1          1          1          1  0  0  0  0  1    0.5354883
-    ## 6          1          1          1          1  0  0  0  0  1    4.7747252
-    ##       psvalue
-    ## 1 0.004631550
-    ## 2 0.008777402
-    ## 3 0.008442159
-    ## 4 0.005549685
-    ## 5 0.009464278
-    ## 6 0.008541629
+    ##           X       Y   PUID   Carbon Department Anual_Prec Prec_Seas  Dis_Def
+    ## 178 1105751 8443292 149038 52.88590          8       2486        53 324.5000
+    ## 183 1108463 8441966 149090 23.76750          8       2239        55 182.4830
+    ## 193 1107703 8440151 149404 37.75690          8       2388        54  60.0000
+    ## 200 1105832 8441130 149801 54.71670          8       2538        52 234.3070
+    ## 209 1102617 8433531 150087  5.94987          8       1774        61  84.8528
+    ## 215 1107531 8439304 150275 53.05250          8       2284        55 120.0000
+    ##     Dis_Rivers District_R Departme_R National_R D7Set10 D7Set1000 D7Set5000
+    ## 178    6829.60   12661.70    6430.51   17222.10 10786.7   34787.8    159891
+    ## 183    7410.00    9654.59    6896.87   15998.20 11634.8   32044.3    160779
+    ## 193    9355.77    9522.48    8846.54   14134.60 12882.7   31405.2    162674
+    ## 200    8794.91   11615.30    8415.25   15061.10 10971.5   32715.1    162004
+    ## 209   15216.20   14386.60   15230.00    8188.41 11930.5   24552.9    170075
+    ## 215   10205.80    9432.84    9694.64   13281.60 12990.1   31011.4    163532
+    ##     D7Set10000 D17Set10 D17Set1000 D17Set5000 D17Set10000 Ecoregions Elevation
+    ## 178     159891 3738.580    18691.2     146583      159891          8      1469
+    ## 183     160779 2588.010    15672.9     149449      160779          8      1977
+    ## 193     162674  939.149    15625.0     150193      162674          8      1673
+    ## 200     162004 1740.260    17715.9     148183      162004          8      1397
+    ## 209     170075 7530.720    19774.6     151555      170075          8      2522
+    ## 215     163532  782.304    15523.4     150666      163532          8      1768
+    ##       Pop2000   Pop2020    Slope Tra_Time00 Tra_Time15 Fores_2000 Fores_2005
+    ## 178 0.0262554 0.0357465  57.7410        770        685          1          1
+    ## 183 0.0317090 0.0420932  41.6500        442        451          1          1
+    ## 193 0.0351959 0.0333368  31.3803        485        508          1          1
+    ## 200 0.0307703 0.0363957  49.6271        639        607          1          1
+    ## 209 0.0449926 0.0193342 120.7510        205        707          1          1
+    ## 215 0.0378849 0.0231144  37.7905        462        508          1          1
+    ##     Fores_2010 Fores_2021 Carbon_pixel id_rincon PA IL CC LC MC     psvalue
+    ## 178          1          1    4.7597309       178 NA NA NA NA  1 0.004631550
+    ## 183          1          1    2.1390750       183 NA NA NA NA  1 0.008777402
+    ## 193          1          1    3.3981211       193 NA NA NA NA  1 0.008442159
+    ## 200          1          1    4.9245031       200 NA NA NA NA  1 0.005549685
+    ## 209          1          1    0.5354883       209 NA NA NA NA  1 0.009464278
+    ## 215          1          1    4.7747252       215 NA NA NA NA  1 0.008541629
 
-``` r
-# Specify the column name in data that defines spatial units in relation to governance type. 
-# This column indicates which spatial units are associated with a type of governance (1) and which are not (0).
-type_gov<- "Type"
-table(data[,type_gov])
-```
+    # Specify the column name in data that defines spatial units in relation to governance type. 
+    # This column indicates which spatial units are associated with a type of governance (1) and which are not (0).
+    type_gov<- "MC"
+    table(data[,type_gov])
 
     ## 
     ##      0      1 
@@ -124,27 +110,25 @@ table(data[,type_gov])
 
 # test multicolinearity
 
-``` r
-# Evaluate multicollinearity: It can distort interpretations by inflating the variance of regression coefficients of variables
-# For matching analysis, we use the glm typegov ~ covar1 + covar2 + covar3 with a binomial distribution to model the probability of governance based on covariates. This formula can also be used to assess multicollinearity, demonstrating how covariate interactions contribute to variance inflation in relation to typegov by mean of the same glm test.
+    # List preliminary covariates-columns in "data" table to estimate similarity for matching.
+    # These are considered preliminary as they will undergo multicollinearity tests and significance checks in relation to governance type.
+      covars<-c( "Department", "Anual_Prec", "Prec_Seas",  "Dis_Def",    "Dis_Rivers",
+                "District_R", "Departme_R", "National_R", "D7Set10",    "D7Set1000",  "D7Set5000",  "D7Set10000", "D17Set10",   "D17Set1000", "D17Set5000",
+                "D17Set10000", "Ecoregions", "Elevation",  "Pop2000",    "Pop2020",    "Slope",      "Tra_Time00", "Tra_Time15")
 
-formula_test_multicor<- as.formula( paste0(type_gov, "~", paste0(covars, collapse = "+")) )
-test_multicor<- glm(formula_test_multicor, data = data, family = binomial()) # sort by inflacion de varianza
-```
+    # Evaluate multicollinearity
+    formula_test_multicor<- as.formula( paste0(type_gov, "~", paste0(covars, collapse = "+")) )
+    test_multicor<- glm(formula_test_multicor, data = data, family = binomial()) # sort by inflacion de varianza
 
-``` r
-print(formula_test_multicor)
-```
+    print(formula_test_multicor)
 
-    ## Type ~ Department + Anual_Prec + Prec_Seas + Dis_Def + Dis_Rivers + 
+    ## MC ~ Department + Anual_Prec + Prec_Seas + Dis_Def + Dis_Rivers + 
     ##     District_R + Departme_R + National_R + D7Set10 + D7Set1000 + 
     ##     D7Set5000 + D7Set10000 + D17Set10 + D17Set1000 + D17Set5000 + 
     ##     D17Set10000 + Ecoregions + Elevation + Pop2000 + Pop2020 + 
     ##     Slope + Tra_Time00 + Tra_Time15
 
-``` r
-test_multicor
-```
+    test_multicor
 
     ## 
     ## Call:  glm(formula = formula_test_multicor, family = binomial(), data = data)
@@ -163,17 +147,13 @@ test_multicor
     ## Null Deviance:       12280 
     ## Residual Deviance: 8159  AIC: 8207
 
-``` r
-# The results of this  model are organized as a correlation matrix, which displays multicollinearity among covariates with respect to the response variable typegov.
-cordataR<- summary(test_multicor, correlation=T)[["correlation"]] %>% as.data.frame.matrix()
-cordataR[,"(Intercept)"]<- NULL; cordataR<- cordataR[2:nrow(cordataR), ]# ELIMINAR INTERCEPT MATRIZ DE CORRELACION
-NACol<- names(which(rowSums(is.na(cordataR)) > (ncol(cordataR)/2) ))
-cordata<- cordataR %>% {.[!names(.) %in% NACol,]} %>% {.[,!colnames(.) %in% NACol]}; cordata[is.na(cordata)]<-0
-```
+    # The results of this  model are organized as a correlation matrix, which displays multicollinearity among covariates with respect to the response variable typegov.
+    cordataR<- summary(test_multicor, correlation=T)[["correlation"]] %>% as.data.frame.matrix()
+    cordataR[,"(Intercept)"]<- NULL; cordataR<- cordataR[2:nrow(cordataR), ]# ELIMINAR INTERCEPT MATRIZ DE CORRELACION
+    NACol<- names(which(rowSums(is.na(cordataR)) > (ncol(cordataR)/2) ))
+    cordata<- cordataR %>% {.[!names(.) %in% NACol,]} %>% {.[,!colnames(.) %in% NACol]}; cordata[is.na(cordata)]<-0
 
-``` r
-str(cordata)
-```
+    str(cordata)
 
     ## 'data.frame':    23 obs. of  23 variables:
     ##  $ Department : num  1 0.03251 0.16061 -0.00873 -0.07882 ...
@@ -200,9 +180,7 @@ str(cordata)
     ##  $ Tra_Time00 : num  0.0247 0.1118 0.0342 0.0104 -0.0973 ...
     ##  $ Tra_Time15 : num  -0.01843 0.05634 0.09136 -0.04218 -0.00846 ...
 
-``` r
-head(cordata)
-```
+    head(cordata)
 
     ##             Department   Anual_Prec   Prec_Seas      Dis_Def   Dis_Rivers
     ## Department  1.00000000  0.032505326 0.160609805 -0.008725980 -0.078823328
@@ -240,55 +218,47 @@ head(cordata)
     ## Dis_Rivers  0.04361611 -0.09726303 -0.008464001
     ## District_R -0.03003442  0.07727625 -0.321160504
 
-``` r
-# From the correlation matrix, we must decide which variables to remove to reduce multicollinearity. To achieve this, we generate groups of correlated variables using a correlation threshold.
-cor_threshold<- 0.65 # define correlation threshold
+    # From the correlation matrix, we must decide which variables to remove to reduce multicollinearity. To achieve this, we generate groups of correlated variables using a correlation threshold.
+    cor_threshold<- 0.65 # define correlation threshold
 
-# Covariate clustering
-corhclust <- hclust(as.dist(1-abs(cordata))) 
-cordend<-as.dendrogram(corhclust)
-cordend_data <- dendro_data(cordend)
+    # Covariate clustering
+    corhclust <- hclust(as.dist(1-abs(cordata))) 
+    cordend<-as.dendrogram(corhclust)
+    cordend_data <- dendro_data(cordend)
 
-# Plot dendrogram of correlated variables. The dendrogram visualizes the correlation among variables, highlighting groups of correlated covariables based on the defined correlation threshold (cor_threshold) marked by a red line.
-var_table <- with(cordend_data$labels, data.frame(y_center = x, y_min= x-0.5, y_max=x+0.5, Variable = as.character(label), height = 1))
-col1<- "#EBEBEB"; col2<- "white"; is.even<- function(x){ x %% 2 == 0 }
-var_table$col<- rep_len(c(col1, col2), length.out=length(var_table$Variable)) %>% {if(is.even(length(.))) {rev(.)} else {.}}
-segment_data <- with(segment(cordend_data), data.frame(x = y, y = x, xend = yend, yend = xend, cor= 1-yend))
+    # Plot dendrogram of correlated variables. The dendrogram visualizes the correlation among variables, highlighting groups of correlated covariables based on the defined correlation threshold (cor_threshold) marked by a red line.
+    var_table <- with(cordend_data$labels, data.frame(y_center = x, y_min= x-0.5, y_max=x+0.5, Variable = as.character(label), height = 1))
+    col1<- "#EBEBEB"; col2<- "white"; is.even<- function(x){ x %% 2 == 0 }
+    var_table$col<- rep_len(c(col1, col2), length.out=length(var_table$Variable)) %>% {if(is.even(length(.))) {rev(.)} else {.}}
+    segment_data <- with(segment(cordend_data), data.frame(x = y, y = x, xend = yend, yend = xend, cor= 1-yend))
 
-ggdendroPlot <-   ggplot()+
-  annotate("rect", xmin = -0.05, xmax = 1.04, fill = var_table$col,ymin = var_table$y_min , ymax = var_table$y_max, alpha = 0.75 )+
-  geom_segment(data= segment_data, aes(x = 1-x, y = y, xend = 1-xend, yend = yend, label= cor), size= 0.3)+
-  scale_y_continuous(breaks = cordend_data$labels$x,  labels = cordend_data$labels$label )+
-  coord_cartesian(expand = F)+
-  labs(x= "Correlation", y= "Variables") +
-  geom_vline(xintercept = cor_threshold, linetype = "dashed", col= "red") +
-  theme(legend.position =  "bottom", legend.key.width = unit(50, 'pt'),
-        plot.margin = margin(t = 0, r = 0,  b = 0,l = 0),
-        panel.grid.major = element_line(color = "gray"),
-        axis.ticks.length   = unit(0.3, "mm"),
-        text = element_text(size = 10))
-```
+    ggdendroPlot <-   ggplot()+
+      annotate("rect", xmin = -0.05, xmax = 1.04, fill = var_table$col,ymin = var_table$y_min , ymax = var_table$y_max, alpha = 0.75 )+
+      geom_segment(data= segment_data, aes(x = 1-x, y = y, xend = 1-xend, yend = yend, label= cor), size= 0.3)+
+      scale_y_continuous(breaks = cordend_data$labels$x,  labels = cordend_data$labels$label )+
+      coord_cartesian(expand = F)+
+      labs(x= "Correlation", y= "Variables") +
+      geom_vline(xintercept = cor_threshold, linetype = "dashed", col= "red") +
+      theme(legend.position =  "bottom", legend.key.width = unit(50, 'pt'),
+            plot.margin = margin(t = 0, r = 0,  b = 0,l = 0),
+            panel.grid.major = element_line(color = "gray"),
+            axis.ticks.length   = unit(0.3, "mm"),
+            text = element_text(size = 10))
 
-``` r
-print(ggdendroPlot)
-```
+    print(ggdendroPlot)
 
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-13-1.png)
 
-``` r
-# Remove high-correlated variables. Following exploration, we select one variable per group to reduce multicollinearity, choosing the variable with the lowest VIF in each group. The VIF indicates the level of multicollinearity; thus, keeping the variable with the lowest VIF in each group to effectively reduce multicollinearity.
-vif_data<- car::vif(test_multicor) %>% as.data.frame() %>% {data.frame(Var= rownames(.), VIF= .[,1])} %>% arrange(VIF)
-vif_values <-  vif_data %>% 
-    dplyr::mutate(Variable1= Var, VIF_var1= VIF, Variable2= Var, VIF_var2= VIF) %>%  dplyr::arrange("VIF")
-rank_covars<- cutree(corhclust, h = 1-cor_threshold) %>% as.data.frame %>% rownames_to_column("Var") %>% setnames(".", "group") %>%
-      dplyr::filter(!Var %in% "(Intercept)") %>% list(vif_data) %>% join_all() %>% arrange(group, VIF)
-    
-covars_no_multicol<- dplyr::filter(rank_covars, !duplicated(group))$Var
-```
+      # Remove high-correlated variables. Following exploration, we select one variable per group to reduce multicollinearity, choosing the variable with the lowest VIF in each group. 
+    vif_data<- car::vif(test_multicor) %>% as.data.frame() %>% {data.frame(Var= rownames(.), VIF= .[,1])} %>% arrange(VIF)
+    vif_values <-  vif_data %>% 
+        dplyr::mutate(Variable1= Var, VIF_var1= VIF, Variable2= Var, VIF_var2= VIF) %>%  dplyr::arrange("VIF")
+    rank_covars<- cutree(corhclust, h = 1-cor_threshold) %>% as.data.frame %>% rownames_to_column("Var") %>% setnames(".", "group") %>%
+          dplyr::filter(!Var %in% "(Intercept)") %>% list(vif_data) %>% join_all() %>% arrange(group, VIF)
+        
+    covars_no_multicol<- dplyr::filter(rank_covars, !duplicated(group))$Var
 
-``` r
-print(rank_covars)
-```
+    print(rank_covars)
 
     ##            Var group         VIF
     ## 1   Department     1    1.686904
@@ -315,9 +285,7 @@ print(rank_covars)
     ## 22  Tra_Time00    20    1.756650
     ## 23  Tra_Time15    21    3.058327
 
-``` r
-print(covars_no_multicol)
-```
+    print(covars_no_multicol)
 
     ##  [1] "Department" "Anual_Prec" "Prec_Seas"  "Dis_Def"    "Dis_Rivers"
     ##  [6] "District_R" "Departme_R" "National_R" "D7Set10"    "D7Set1000" 
@@ -325,43 +293,35 @@ print(covars_no_multicol)
     ## [16] "Elevation"  "Pop2000"    "Pop2020"    "Slope"      "Tra_Time00"
     ## [21] "Tra_Time15"
 
-``` r
-# Optimization and adjustment for selecting the best model ####
-pre_formula_glm<- as.formula( paste0(type_gov, "~", paste0(covars_no_multicol, collapse = "+")) ) # new formula with variables that do not exhibit multicollinearity
-```
+    # Optimization and adjustment for selecting the best model ####
+    pre_formula_glm<- as.formula( paste0(type_gov, "~", paste0(covars_no_multicol, collapse = "+")) ) # new formula with variables that do not exhibit multicollinearity
 
-``` r
-print(pre_formula_glm)
-```
+    print(pre_formula_glm)
 
-    ## Type ~ Department + Anual_Prec + Prec_Seas + Dis_Def + Dis_Rivers + 
+    ## MC ~ Department + Anual_Prec + Prec_Seas + Dis_Def + Dis_Rivers + 
     ##     District_R + Departme_R + National_R + D7Set10 + D7Set1000 + 
     ##     D7Set5000 + D7Set10000 + D17Set10 + D17Set5000 + Ecoregions + 
     ##     Elevation + Pop2000 + Pop2020 + Slope + Tra_Time00 + Tra_Time15
 
-``` r
-# Estimate forward and backward models. This technique iteratively adds and removes variables to find the optimal model that balances complexity with predictive power. We calculate "rsq" (R-squared), "rss" (Residual Sum of Squares), "adjr2" (Adjusted R-squared), "cp" (Mallows' Cp), "bic" (Bayesian Information Criterion), and AIC (Akaike Information Criterion). Each criterion offers a different perspective on model performance, balancing complexity against the risk of overfitting. By default we use AIC to select the better models.
-model  <- regsubsets(pre_formula_glm, data = data, nvmax = length(covars), method = "seqrep")
-summ_model<-summary(model)[c("rsq", "rss", "adjr2", "cp", "bic" )] %>% as.data.frame() %>% dplyr::mutate(model= seq(nrow(.)))
-list_models<- seq(nrow(summ_model))
-AIC_models<- pblapply(list_models, function(x){
-    coefs<- coef(model, id = x) # get coefficients
-    vars<- names(coefs)[-1] # get vars
-    form_test<- as.formula( paste0(type_gov, "~", paste0(vars, collapse = "+")) ) # organize form
-    glm_test<- glm(form_test, data = data, family = binomial()) # run glm
-    data_AIC<- data.frame(model= x, AIC= extractAIC(glm_test)[2]) # get AIC
-    data_vars <- data.frame(model= x, vars= vars) # get data vars
-    data_form<- data.frame(model= x, formula = paste0(type_gov, "~", paste0(vars, collapse = "+")) ) # get data forms
-    list(data_AIC=data_AIC, data_vars=data_vars, data_form= data_form )   })
-  
-# Ranking mejores modelos
-# Compiles the formulas of models evaluated by AIC into a single dataframe for easy comparison.
-forms_models<- rbind.fill(purrr::map(AIC_models, "data_form"))
-```
+      # Estimate forward and backward models. adds and removes variables through multiple iterations to find the optimal model that balances complexity with predictive power. We use AIC to select the best model.
+    model  <- regsubsets(pre_formula_glm, data = data, nvmax = length(covars), method = "seqrep")
+    summ_model<-summary(model)[c("rsq", "rss", "adjr2", "cp", "bic" )] %>% as.data.frame() %>% dplyr::mutate(model= seq(nrow(.)))
+    list_models<- seq(nrow(summ_model))
+    AIC_models<- pblapply(list_models, function(x){
+        coefs<- coef(model, id = x) # get coefficients
+        vars<- names(coefs)[-1] # get vars
+        form_test<- as.formula( paste0(type_gov, "~", paste0(vars, collapse = "+")) ) # organize form
+        glm_test<- glm(form_test, data = data, family = binomial()) # run glm
+        data_AIC<- data.frame(model= x, AIC= extractAIC(glm_test)[2]) # get AIC
+        data_vars <- data.frame(model= x, vars= vars) # get data vars
+        data_form<- data.frame(model= x, formula = paste0(type_gov, "~", paste0(vars, collapse = "+")) ) # get data forms
+        list(data_AIC=data_AIC, data_vars=data_vars, data_form= data_form )   })
+      
+    # Ranking models
+    # Compiles the formulas of models evaluated by AIC into a single dataframe for easy comparison.
+    forms_models<- rbind.fill(purrr::map(AIC_models, "data_form"))
 
-``` r
-print(forms_models)
-```
+    print(forms_models)
 
     ##    model
     ## 1      1
@@ -385,39 +345,35 @@ print(forms_models)
     ## 19    19
     ## 20    20
     ## 21    21
-    ##                                                                                                                                                                                                                 formula
-    ## 1                                                                                                                                                                                                       Type~Tra_Time15
-    ## 2                                                                                                                                                                                             Type~Anual_Prec+Prec_Seas
-    ## 3                                                                                                                                                                                  Type~Anual_Prec+Prec_Seas+Tra_Time15
-    ## 4                                                                                                                                                                        Type~Anual_Prec+Prec_Seas+District_R+Elevation
-    ## 5                                                                                                                                                               Type~Anual_Prec+Prec_Seas+District_R+D17Set10+Elevation
-    ## 6                                                                                                                                                     Type~Anual_Prec+Prec_Seas+D7Set5000+D17Set10+D17Set5000+Elevation
-    ## 7                                                                                                                                             Type~Anual_Prec+Prec_Seas+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation
-    ## 8                                                                                                                                     Type~Anual_Prec+Prec_Seas+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000
-    ## 9                                                                                                                               Type~Anual_Prec+Prec_Seas+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000+Slope
-    ## 10                                                                                                              Type~Anual_Prec+Prec_Seas+District_R+Departme_R+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000
-    ## 11                                                                                                        Type~Anual_Prec+Prec_Seas+District_R+Departme_R+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000+Slope
-    ## 12                                                                                      Type~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000
-    ## 13                                                                                  Type~Anual_Prec+Prec_Seas+Dis_Rivers+District_R+Departme_R+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000+Slope+Tra_Time00
-    ## 14                                                                  Type~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000
-    ## 15                                                             Type~Department+Anual_Prec+Prec_Seas+Dis_Rivers+District_R+Departme_R+D7Set10+D7Set1000+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000+Slope+Tra_Time00
-    ## 16                                             Type~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Ecoregions+Elevation
-    ## 17                                          Type~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Elevation+Pop2000+Slope+Tra_Time00
-    ## 18                               Type~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Ecoregions+Elevation+Pop2000+Slope+Tra_Time00
-    ## 19                    Type~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Ecoregions+Elevation+Pop2000+Slope+Tra_Time00
-    ## 20            Type~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Ecoregions+Elevation+Pop2000+Pop2020+Slope+Tra_Time00
-    ## 21 Type~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Ecoregions+Elevation+Pop2000+Pop2020+Slope+Tra_Time00+Tra_Time15
+    ##                                                                                                                                                                                                               formula
+    ## 1                                                                                                                                                                                                       MC~Tra_Time15
+    ## 2                                                                                                                                                                                             MC~Anual_Prec+Prec_Seas
+    ## 3                                                                                                                                                                                  MC~Anual_Prec+Prec_Seas+Tra_Time15
+    ## 4                                                                                                                                                                        MC~Anual_Prec+Prec_Seas+District_R+Elevation
+    ## 5                                                                                                                                                               MC~Anual_Prec+Prec_Seas+District_R+D17Set10+Elevation
+    ## 6                                                                                                                                                     MC~Anual_Prec+Prec_Seas+D7Set5000+D17Set10+D17Set5000+Elevation
+    ## 7                                                                                                                                             MC~Anual_Prec+Prec_Seas+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation
+    ## 8                                                                                                                                     MC~Anual_Prec+Prec_Seas+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000
+    ## 9                                                                                                                               MC~Anual_Prec+Prec_Seas+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000+Slope
+    ## 10                                                                                                              MC~Anual_Prec+Prec_Seas+District_R+Departme_R+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000
+    ## 11                                                                                                        MC~Anual_Prec+Prec_Seas+District_R+Departme_R+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000+Slope
+    ## 12                                                                                      MC~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000
+    ## 13                                                                                  MC~Anual_Prec+Prec_Seas+Dis_Rivers+District_R+Departme_R+D7Set10+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000+Slope+Tra_Time00
+    ## 14                                                                  MC~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000
+    ## 15                                                             MC~Department+Anual_Prec+Prec_Seas+Dis_Rivers+District_R+Departme_R+D7Set10+D7Set1000+D7Set5000+D17Set10+D17Set5000+Elevation+Pop2000+Slope+Tra_Time00
+    ## 16                                             MC~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Ecoregions+Elevation
+    ## 17                                          MC~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Elevation+Pop2000+Slope+Tra_Time00
+    ## 18                               MC~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Ecoregions+Elevation+Pop2000+Slope+Tra_Time00
+    ## 19                    MC~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Ecoregions+Elevation+Pop2000+Slope+Tra_Time00
+    ## 20            MC~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Ecoregions+Elevation+Pop2000+Pop2020+Slope+Tra_Time00
+    ## 21 MC~Department+Anual_Prec+Prec_Seas+Dis_Def+Dis_Rivers+District_R+Departme_R+National_R+D7Set10+D7Set1000+D7Set5000+D7Set10000+D17Set10+D17Set5000+Ecoregions+Elevation+Pop2000+Pop2020+Slope+Tra_Time00+Tra_Time15
 
-``` r
-# Aggregates AIC information, merges it with summary model data, and ranks models based on BIC and AIC values to identify the best performers.
-better_models<- rbind.fill(purrr::map(AIC_models, "data_AIC")) %>% list(summ_model) %>% join_all() %>% 
-    dplyr::arrange( bic) %>% dplyr::mutate(rank_BIC= seq(nrow(.))) %>% 
-    dplyr::arrange(AIC) %>% dplyr::mutate(rank_AIC= seq(nrow(.)))
-```
+      # Aggregates AIC information, merges it with summary model data, and ranks models based on BIC and AIC values to identify the best performers.
+    better_models<- rbind.fill(purrr::map(AIC_models, "data_AIC")) %>% list(summ_model) %>% join_all() %>% 
+        dplyr::arrange( bic) %>% dplyr::mutate(rank_BIC= seq(nrow(.))) %>% 
+        dplyr::arrange(AIC) %>% dplyr::mutate(rank_AIC= seq(nrow(.)))
 
-``` r
-print(better_models)
-```
+    print(better_models)
 
     ##    model       AIC         rsq      rss       adjr2         cp       bic
     ## 1     19  8558.893 0.023772632 908.3361 0.023697261   18.08911 -5673.173
@@ -464,54 +420,42 @@ print(better_models)
     ## 20       21       20
     ## 21       20       21
 
-``` r
-# Selection of the best model
-# Allows the researcher to review the ranked models based on selected criteria (default: AIC)
-critera<- "AIC" # DEFAULT
+    # Selection of the best model
+    # Allows the researcher to review the ranked models based on selected criteria (default: AIC)
+    critera<- "AIC" # DEFAULT
 
-# Collates variables from the best AIC models, ranks them by frequency of appearance, and prepares them for visualization analysis.
-data_vars<-  rbind.fill(purrr::map(AIC_models, "data_vars")) %>% list(better_models) %>% 
-    join_all() %>%  dplyr::group_by(vars) %>% dplyr::mutate(freq_var= n()) %>% 
-    dplyr::arrange(freq_var) %>% dplyr::mutate(vars= factor(vars, levels = unique(.$vars)) ) 
-  
-# Organizes and ranks models based on the selected criterion preparing for the selection of the best model.
-vars_models<- data_vars %>% dplyr::arrange(eval(sym(critera))) %>% 
-    dplyr::mutate(model= factor(model, levels = unique(.$model)) ) %>% as.data.frame()
-  
+    # Collates variables from the best AIC models, ranks them by frequency of appearance, and prepares them for visualization analysis.
+    data_vars<-  rbind.fill(purrr::map(AIC_models, "data_vars")) %>% list(better_models) %>% 
+        join_all() %>%  dplyr::group_by(vars) %>% dplyr::mutate(freq_var= n()) %>% 
+        dplyr::arrange(freq_var) %>% dplyr::mutate(vars= factor(vars, levels = unique(.$vars)) ) 
+      
+    # Organizes and ranks models based on the selected criterion preparing for the selection of the best model.
+    vars_models<- data_vars %>% dplyr::arrange(eval(sym(critera))) %>% 
+        dplyr::mutate(model= factor(model, levels = unique(.$model)) ) %>% as.data.frame()
+      
 
-# Identifies the best model based on the ranking, setting it aside for in-depth analysis and use in matching.
-better_model<- unique(vars_models[1,1])
-```
+    # Identifies the best model based on the ranking, setting it aside for in-depth analysis and use in matching.
+    better_model<- unique(vars_models[1,1])
 
-``` r
-print(better_model)
-```
+    print(better_model)
 
     ## [1] 19
     ## Levels: 19 20 21 18 17 16 14 15 13 12 11 10 5 9 7 8 4 6 3 1 2
 
-``` r
-# Selected variables for the best model
-selected_variables<- data_vars %>% dplyr::arrange(eval(sym(critera))) %>% 
-  dplyr::filter(model %in% better_model) %>% {as.character(.$vars)}
-```
+    # Selected variables for the best model
+    selected_variables<- data_vars %>% dplyr::arrange(eval(sym(critera))) %>% 
+      dplyr::filter(model %in% better_model) %>% {as.character(.$vars)}
 
-``` r
-print(selected_variables)
-```
+    print(selected_variables)
 
-``` r
-# Plot best models' AIC by variable. The heatmap displays the top-performing models horizontally and the most impactful variables vertically. Warmer hues indicate superior AIC values, illustrating the effectiveness of each variable within the highest-ranked models as per the chosen metric (e.g., AIC). 
-plot_better_model<-  ggplot()+
-    geom_tile(data= vars_models, aes(x= model , y= vars, fill = eval(sym(critera)) ), color="black", alpha= 0.5, size=0.2)+
-    scale_fill_gradientn(critera, colors = brewer.pal(11, "Spectral"))  
-```
+      # Plot best models' AIC by variable. The heatmap displays the top-performing models horizontally and the most impactful variables vertically. Warmer hues indicate superior AIC values, illustrating the effectiveness of each variable within the highest-ranked models as per the chosen metric (AIC). 
+    plot_better_model<-  ggplot()+
+        geom_tile(data= vars_models, aes(x= model , y= vars, fill = eval(sym(critera)) ), color="black", alpha= 0.5, size=0.2)+
+        scale_fill_gradientn(critera, colors = brewer.pal(11, "Spectral"))  
 
-``` r
-print(plot_better_model)
-```
+    print(plot_better_model)
 
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-27-1.png)<!-- -->
+![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-27-1.png)
 
 # Pre-matching exploratory analysis
 
@@ -520,44 +464,37 @@ variables across the typegov groups. It provides an initial diagnostic
 of the data, setting the stage for understanding the impact of the
 matching process.
 
-``` r
-# Propensity scores calculation. Propensity scores estimate the probability of treatment assignment based on observed covariates
-# Identifies the 'treated' group based on 'type_gov' == 1, then calculates the standardized differences for selected variables. These differences help in assessing the balance between treated and untreated groups before matching.
-treated <-(data[,type_gov] ==1) 
-cov <-data[,selected_variables]
-std.diff <-apply(cov,2,function(x) 100*(mean(x[treated])- mean(x[!treated]))/(sqrt(0.5*(var(x[treated]) + var(x[!treated]))))) %>% abs()
-  
-# Generate a propensity score model
-formula_glm<- as.formula( paste0(type_gov, "~", paste0(selected_variables, collapse = "+")) )
-```
+      # Propensity scores calculation.
+      # Identifies the 'treated' group based on 'type_gov' == 1, then calculates the standardized differences for selected variables before matching.
+    treated <-(data[,type_gov] ==1) 
+    cov <-data[,selected_variables]
+    std.diff <-apply(cov,2,function(x) 100*(mean(x[treated])- mean(x[!treated]))/(sqrt(0.5*(var(x[treated]) + var(x[!treated]))))) %>% abs()
+      
+    # Generate a propensity score model
+    formula_glm<- as.formula( paste0(type_gov, "~", paste0(selected_variables, collapse = "+")) )
 
-``` r
-print(formula_glm)
-```
+    print(formula_glm)
 
-    ## Type ~ Ecoregions + National_R + Tra_Time00 + Dis_Def + D7Set10000 + 
+    ## MC ~ Ecoregions + National_R + Tra_Time00 + Dis_Def + D7Set10000 + 
     ##     Department + D7Set1000 + Slope + Dis_Rivers + Pop2000 + Departme_R + 
     ##     District_R + D7Set10 + D17Set5000 + D7Set5000 + D17Set10 + 
     ##     Elevation + Anual_Prec + Prec_Seas
 
-``` r
-ps <- glm(formula_glm, data = data, family = binomial())
+    ps <- glm(formula_glm, data = data, family = binomial())
 
-# Estimate propensity scores predicted by the logistic model.
-data$psvalue <- predict(ps, type = "response")
+    # Estimate propensity scores predicted by the logistic model.
+    data$psvalue <- predict(ps, type = "response")
 
-# Organizes standardized differences for easy analysis and visualization, highlighting variables with the most imbalance.
-PreMatchingIndexData<- data.frame(abs(std.diff)) %>% set_names("imbalance") %>% tibble::rownames_to_column(var="Variable") %>%  arrange(imbalance)
+    # Organizes standardized differences for easy analysis and visualization, highlighting variables with the most imbalance.
+    PreMatchingIndexData<- data.frame(abs(std.diff)) %>% set_names("imbalance") %>% tibble::rownames_to_column(var="Variable") %>%  arrange(imbalance)
 
-# A good balance is considered to be less than 25%. For visualization purposes, imbalances greater than 100% are capped at 100%. # An imbalance over 25% indicates significant differences in group characteristics, necessitating adjustment for unbiased causal inference.
-PreMatchingIndexDataV2<- PreMatchingIndexData  %>%  arrange(desc(imbalance)) %>%
-    mutate(imbalance= ifelse(imbalance>=100,100,imbalance)) %>% 
-    mutate(Variable= factor(Variable, levels = unique(.$Variable)), label= paste0(paste(paste(rep("   ",3), collapse = ""), collapse = ""), Variable, sep=""))
-```
+      # A good balance is considered to be less than 25%. For visualization purposes, imbalances greater than 100% are capped at 100%. # An imbalance over 25% indicates significant differences in group characteristics.
 
-``` r
-print(PreMatchingIndexDataV2)
-```
+    PreMatchingIndexDataV2<- PreMatchingIndexData  %>%  arrange(desc(imbalance)) %>%
+        mutate(imbalance= ifelse(imbalance>=100,100,imbalance)) %>% 
+        mutate(Variable= factor(Variable, levels = unique(.$Variable)), label= paste0(paste(paste(rep("   ",3), collapse = ""), collapse = ""), Variable, sep=""))
+
+    print(PreMatchingIndexDataV2)
 
     ##      Variable imbalance               label
     ## 1  National_R 100.00000          National_R
@@ -582,502 +519,474 @@ print(PreMatchingIndexDataV2)
 
 # Execute matching analysis
 
-``` r
-# Performs matching based on the specified criteria to balance the treatment and control groups, enhancing the validity of causal inferences. 
-# The 'formula_glm' defines the treatment indicator and covariates for matching, 'method = "nearest"' specifies nearest neighbor matching to pair individuals based on similarity in propensity scores, and 'ratio = 1' ensures a 1:1 match between treated and untreated units, aiming for the closest match possible without replacement.
+     # Performs matching based on the specified criteria
+      # The 'formula_glm' defines the treatment indicator and covariates for matching, 'method = "nearest"'.
+    m.nn <- matchit(formula_glm, data =data, method= "nearest", ratio = 1)
 
-m.nn <- matchit(formula_glm, data =data, method= "nearest", ratio = 1)
-```
+    # Extracts the matched dataset and calculates the deforestation indicator. 'deforest' is defined as 1 if the forest status changed from present ('Fores_2000' == 1) to absent ('Fores_2021' == 0) over the study period, and 0 otherwise.
+      y=match.data(m.nn, group="all")
 
-``` r
-# Propensity scores calculation. 
-treated1 <-(y[, type_gov]==1)
+    # Propensity scores calculation. 
+    treated1 <-(y[, type_gov]==1)
 
-cov1 <-y[, selected_variables]
-std.diff1 <-apply(cov1,2,function(x) 100*(mean(x[treated1])- mean(x[!treated1]))/(sqrt(0.5*(var(x[treated1]) + var(x[!treated1]))))) 
-  
-# Organizes standardized differences for easy analysis and visualization
-posmatchingIndexData<- data.frame(abs(std.diff1)) %>% set_names("imbalance") %>% tibble::rownames_to_column(var="Variable") %>%  arrange(imbalance)
-posmatchingIndexDataV2<- posmatchingIndexData  %>%  arrange(desc(imbalance)) %>%
-  mutate(imbalance= ifelse(imbalance>=100,100,imbalance)) %>% 
-  mutate(Variable= factor(Variable, levels = unique(.$Variable)), label= paste0(paste(paste(rep("   ",3), collapse = ""), collapse = ""), Variable, sep=""))
+    cov1 <-y[, selected_variables]
+    std.diff1 <-apply(cov1,2,function(x) 100*(mean(x[treated1])- mean(x[!treated1]))/(sqrt(0.5*(var(x[treated1]) + var(x[!treated1]))))) 
+      
+    # Organizes standardized differences for easy analysis and visualization
+    posmatchingIndexData<- data.frame(abs(std.diff1)) %>% set_names("imbalance") %>% tibble::rownames_to_column(var="Variable") %>%  arrange(imbalance)
+    posmatchingIndexDataV2<- posmatchingIndexData  %>%  arrange(desc(imbalance)) %>%
+      mutate(imbalance= ifelse(imbalance>=100,100,imbalance)) %>% 
+      mutate(Variable= factor(Variable, levels = unique(.$Variable)), label= paste0(paste(paste(rep("   ",3), collapse = ""), collapse = ""), Variable, sep=""))
 
-# Estimate percent balance improvement. Organize the standardized differences before and after matching data.
-summ_Imbalancedata<- plyr::rbind.fill(list( dplyr::mutate(PreMatchingIndexDataV2, Match= "Unmatched"),  dplyr::mutate(posmatchingIndexDataV2, Match= "Matched")))
+    # Estimate percent balance improvement. Organize the standardized differences before and after matching data.
+    summ_Imbalancedata<- plyr::rbind.fill(list( dplyr::mutate(PreMatchingIndexDataV2, Match= "Unmatched"),  dplyr::mutate(posmatchingIndexDataV2, Match= "Matched")))
 
-  
-# Plotting imbalance data. The plot demonstrates the improvements in variable imbalance before and after matching.
+      
+    # Plotting imbalance data. The plot demonstrates the improvements in variable imbalance before and after matching.
 
-y_axis_title_unbalanced_vars_posmatch<- "Index of covariate imbalance"
-x_axis_title_unbalanced_vars_posmatch<- "Variables"
-legend_title_unbalanced_vars_posmatch<- "Pixeles de la ventana"
-plot_title_unbalanced_vars_posmatch<- "Pos Matching"
-color_vline_unbalanced_vars_posmatch<- "red"
-pos_vline_unbalanced_vars_posmatch<- 25
+    y_axis_title_unbalanced_vars_posmatch<- "Index of covariate imbalance"
+    x_axis_title_unbalanced_vars_posmatch<- "Variables"
+    legend_title_unbalanced_vars_posmatch<- "Pixeles de la ventana"
+    plot_title_unbalanced_vars_posmatch<- "Pos Matching"
+    color_vline_unbalanced_vars_posmatch<- "red"
+    pos_vline_unbalanced_vars_posmatch<- 25
 
-gg_summ_Imbalancedata<- ggplot(data= summ_Imbalancedata)+  
-  geom_point(aes(x=imbalance, y= Variable, color= Match), size= 1) +
-  labs(x= y_axis_title_unbalanced_vars_posmatch, y= x_axis_title_unbalanced_vars_posmatch)+
-  geom_vline(aes(xintercept= pos_vline_unbalanced_vars_posmatch),  size= 0.5, linetype="dashed", color = color_vline_unbalanced_vars_posmatch)+
-  theme(
-    plot.margin = margin(t = 0, r = 0,  b = 0,l = 0),
-    axis.ticks.length   = unit(0.3, "mm"),
-    text = element_text(size = 10),
-    panel.background = element_rect(fill = NA), panel.grid.major = element_line(color = "gray"),
-    axis.line = element_line(size = 0.5, colour = "black") )+
-  scale_x_continuous(expand = c(0,0), limits = c(0,110))+
-  ggtitle(type_gov)
-```
+    gg_summ_Imbalancedata<- ggplot(data= summ_Imbalancedata)+  
+      geom_point(aes(x=imbalance, y= Variable, color= Match), size= 1) +
+      labs(x= y_axis_title_unbalanced_vars_posmatch, y= x_axis_title_unbalanced_vars_posmatch)+
+      geom_vline(aes(xintercept= pos_vline_unbalanced_vars_posmatch),  size= 0.5, linetype="dashed", color = color_vline_unbalanced_vars_posmatch)+
+      theme(
+        plot.margin = margin(t = 0, r = 0,  b = 0,l = 0),
+        axis.ticks.length   = unit(0.3, "mm"),
+        text = element_text(size = 10),
+        panel.background = element_rect(fill = NA), panel.grid.major = element_line(color = "gray"),
+        axis.line = element_line(size = 0.5, colour = "black") )+
+      scale_x_continuous(expand = c(0,0), limits = c(0,110))+
+      ggtitle(type_gov)
 
-``` r
-print(gg_summ_Imbalancedata)
-```
+    print(gg_summ_Imbalancedata)
 
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-34-1.png)<!-- -->
+![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-34-1.png)
 
 # Plotting Imbalance Figure.
 
 This plot visualizes the distribution of propensity scores before and
-after matching through histograms. It helps to assess the effectiveness
-of the matching process in balancing the covariates between treated and
-untreated groups.
+after matching through histograms.
 
-``` r
-# Splitting the pre-matching data based on the 'type_gov' variable to compare groups inside and outside the treatment condition.
-includedListPreMatching <- split(data, data[, type_gov])
+      # Splitting the pre-matching data based on the 'type_gov' variable to compare groups inside and outside the treatment condition.
+    includedListPreMatching <- split(data, data[, type_gov])
 
-# Set graphic parameters for pre-matching histograms.
-in_area_prematch <- list(title= paste0("In ", type_gov), color= "goldenrod")
-out_area_prematch <- list(title= paste0("Out ", type_gov), color= "olivedrab")
-y_axis_title_prematch <- "Number of Units"
-x_axis_title_prematch <- "Propensity Score"
-legend_title_prematch <- "Window Pixels"
-plot_title_prematch <- "Pre Matching"
+    # Set graphic parameters for pre-matching histograms.
+    in_area_prematch <- list(title= paste0("In ", type_gov), color= "goldenrod")
+    out_area_prematch <- list(title= paste0("Out ", type_gov), color= "olivedrab")
+    y_axis_title_prematch <- "Number of Units"
+    x_axis_title_prematch <- "Propensity Score"
+    legend_title_prematch <- "Window Pixels"
+    plot_title_prematch <- "Pre Matching"
 
-# Create pre-matching plot.
-PreMatchversusplot <- ggplot(data = includedListPreMatching[["0"]]) +
-  geom_histogram(data = includedListPreMatching[["1"]], aes(x = psvalue, y = ..count.., 
-                                                            fill = in_area_prematch$title, color = in_area_prematch$title)) +
-  geom_histogram(aes(x = psvalue, y = -..count.., fill = out_area_prematch$title, color = out_area_prematch$title)) +
-  scale_y_continuous(labels = abs) +
-  scale_fill_manual(values = alpha(c(out_area_prematch$color, in_area_prematch$color), 0.5), name = legend_title_prematch) +
-  scale_color_manual(values = alpha(c(out_area_prematch$color, in_area_prematch$color), 1), name = legend_title_prematch) +
-  labs(x = x_axis_title_prematch, y = y_axis_title_prematch, title = plot_title_prematch) +
-  guides(size = "none", fill = guide_legend(title.position="top", title.hjust = 0.5)) +
-  theme_minimal() + theme(legend.position = "bottom", text = element_text(size = 10))
+    # Create pre-matching plot.
+    PreMatchversusplot <- ggplot(data = includedListPreMatching[["0"]]) +
+      geom_histogram(data = includedListPreMatching[["1"]], aes(x = psvalue, y = ..count.., 
+                                                                fill = in_area_prematch$title, color = in_area_prematch$title)) +
+      geom_histogram(aes(x = psvalue, y = -..count.., fill = out_area_prematch$title, color = out_area_prematch$title)) +
+      scale_y_continuous(labels = abs) +
+      scale_fill_manual(values = alpha(c(out_area_prematch$color, in_area_prematch$color), 0.5), name = legend_title_prematch) +
+      scale_color_manual(values = alpha(c(out_area_prematch$color, in_area_prematch$color), 1), name = legend_title_prematch) +
+      labs(x = x_axis_title_prematch, y = y_axis_title_prematch, title = plot_title_prematch) +
+      guides(size = "none", fill = guide_legend(title.position="top", title.hjust = 0.5)) +
+      theme_minimal() + theme(legend.position = "bottom", text = element_text(size = 10))
 
-# Splitting the post-matching data.
-includedListposmatching <- split(y, y[, type_gov])
+    # Splitting the post-matching data.
+    includedListposmatching <- split(y, y[, type_gov])
 
-# Set graphic parameters for post-matching histograms.
-in_area_posmatch <- list(title= paste0("In ", type_gov), color= "goldenrod")
-out_area_posmatch <- list(title= paste0("Out ", type_gov), color= "olivedrab")
-y_axis_title_posmatch <- "Number of Units"
-x_axis_title_posmatch <- "Propensity Score"
-legend_title_posmatch <- "Window Pixels"
-plot_title_posmatch <- "Post Matching"
+    # Set graphic parameters for post-matching histograms.
+    in_area_posmatch <- list(title= paste0("In ", type_gov), color= "goldenrod")
+    out_area_posmatch <- list(title= paste0("Out ", type_gov), color= "olivedrab")
+    y_axis_title_posmatch <- "Number of Units"
+    x_axis_title_posmatch <- "Propensity Score"
+    legend_title_posmatch <- "Window Pixels"
+    plot_title_posmatch <- "Post Matching"
 
-# Create post-matching plot.
-posmatchversusplot <- ggplot(data = includedListposmatching[["0"]]) +
-  geom_histogram(data = includedListposmatching[["1"]], aes(x = psvalue, y = ..count.., 
-                                                            fill = in_area_posmatch$title, color = in_area_posmatch$title)) +
-  geom_histogram(aes(x = psvalue, y = -..count.., fill = out_area_posmatch$title, color = out_area_posmatch$title)) +
-  scale_y_continuous(labels = abs) +
-  scale_fill_manual(values = alpha(c(out_area_posmatch$color, in_area_posmatch$color), 0.5), name = legend_title_posmatch) +
-  scale_color_manual(values = alpha(c(out_area_posmatch$color, in_area_posmatch$color), 1), name = legend_title_posmatch) +
-  labs(x = x_axis_title_posmatch, y = y_axis_title_posmatch, title = plot_title_posmatch) +
-  scale_x_continuous(limits = c(0, 1)) +
-  guides(size = "none", fill = guide_legend(title.position="top", title.hjust = 0.5)) +
-  theme_minimal() + theme(legend.position = "bottom", text = element_text(size = 10))
+    # Create post-matching plot.
+    posmatchversusplot <- ggplot(data = includedListposmatching[["0"]]) +
+      geom_histogram(data = includedListposmatching[["1"]], aes(x = psvalue, y = ..count.., 
+                                                                fill = in_area_posmatch$title, color = in_area_posmatch$title)) +
+      geom_histogram(aes(x = psvalue, y = -..count.., fill = out_area_posmatch$title, color = out_area_posmatch$title)) +
+      scale_y_continuous(labels = abs) +
+      scale_fill_manual(values = alpha(c(out_area_posmatch$color, in_area_posmatch$color), 0.5), name = legend_title_posmatch) +
+      scale_color_manual(values = alpha(c(out_area_posmatch$color, in_area_posmatch$color), 1), name = legend_title_posmatch) +
+      labs(x = x_axis_title_posmatch, y = y_axis_title_posmatch, title = plot_title_posmatch) +
+      scale_x_continuous(limits = c(0, 1)) +
+      guides(size = "none", fill = guide_legend(title.position="top", title.hjust = 0.5)) +
+      theme_minimal() + theme(legend.position = "bottom", text = element_text(size = 10))
 
-# Arrange pre and post matching plots together for comparison.
-summ_matching_propension_plot <- ggpubr::ggarrange(plotlist = list(PreMatchversusplot, posmatchversusplot), common.legend = T, legend = "bottom")
-```
+    # Arrange pre and post matching plots together for comparison.
+    summ_matching_propension_plot <- ggpubr::ggarrange(plotlist = list(PreMatchversusplot, posmatchversusplot), common.legend = T, legend = "bottom")
 
-``` r
-print(summ_matching_propension_plot)
-```
+    print(summ_matching_propension_plot)
 
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-43-8.png)<!-- -->
+![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-36-1.png)
 
+    test_multicor
+
+    ## 
+    ## Call:  glm(formula = formula_test_multicor, family = binomial(), data = data)
+    ## 
+    ## Coefficients:
+    ## (Intercept)   Department   Anual_Prec    Prec_Seas      Dis_Def   Dis_Rivers  
+    ##  -6.929e+00    6.682e-02    1.741e-04    4.758e-02   -5.745e-04   -3.001e-05  
+    ##  District_R   Departme_R   National_R      D7Set10    D7Set1000    D7Set5000  
+    ##  -5.490e-05    3.424e-05   -3.051e-05   -5.634e-05   -2.857e-05   -1.357e-05  
+    ##  D7Set10000     D17Set10   D17Set1000   D17Set5000  D17Set10000   Ecoregions  
+    ##  -1.283e-04   -5.541e-06    5.539e-05   -2.307e-05    1.621e-04   -2.827e-03  
+    ##   Elevation      Pop2000      Pop2020        Slope   Tra_Time00   Tra_Time15  
+    ##   2.292e-04    5.773e-02    6.310e-04   -6.679e-03   -2.982e-04   -1.017e-05  
+    ## 
+    ## Degrees of Freedom: 246113 Total (i.e. Null);  246090 Residual
+    ## Null Deviance:       12280 
+    ## Residual Deviance: 8159  AIC: 8207
 
 # Analysis post-matching
 
-From this point onwards, response variables from the matched groups can
-be evaluated. In this case, we will analyze changes per pixel in
-variables related to forests and carbon in 2000 and 2021
+Outputs from the matched groups are evaluated. We assessed changes per
+pixel in relation to forests and carbon in 2000 and 2021
 
-``` r
-# Map the matched groups
-# Retrieve matching pairs from the 'matchit' result to align the treatment (T) and control (C) groups for further analysis.
-matches <- data.frame(m.nn$match.matrix)
-group1 <- match(row.names(matches), row.names(y))
-group2 <- match(matches[, 1], row.names(y))
-```
+    # Map the matched groups
+    # Retrieve matching pairs from the 'matchit' result to align the treatment (T) and control (C) groups for further analysis.
+    matches <- data.frame(m.nn$match.matrix)
+    group1 <- match(row.names(matches), row.names(y))
+    group2 <- match(matches[, 1], row.names(y))
 
-``` r
-# Estimate forest and carbon trends ####
+    # Estimate forest and carbon trends ####
 
-########### Forests effect
-# Extract forest status data for the treated T group at different time points.
-forest_yT2000 <- y$Fores_2000[group1]
-forest_yT2021 <- y$Fores_2021[group1]
+    ########### Forests effect
+    # Extract forest status data for the treated T group at different time points.
+    forest_yT2000 <- y$Fores_2000[group1]
+    forest_yT2021 <- y$Fores_2021[group1]
 
-# Extract forest status data for the control C group at different time points.
-forest_yC2000 <- y$Fores_2000[group2]
-forest_yC2021 <- y$Fores_2021[group2]
+    # Extract forest status data for the control C group at different time points.
+    forest_yC2000 <- y$Fores_2000[group2]
+    forest_yC2021 <- y$Fores_2021[group2]
 
-########### Carbon effect
-carbon_yt<- y$Carbon_pixel[group1]
-carbon_yC<- y$Carbon_pixel[group2] 
+    ########### Carbon effect
+    carbon_yt<- y$Carbon_pixel[group1]
+    carbon_yC<- y$Carbon_pixel[group2] 
 
-## summ match  
-matched.cases_forest <- cbind(matches, forest_yT2000, forest_yT2021, forest_yC2000, forest_yC2021, carbon_yt, carbon_yC)
-```
+    ## summ match  
+    matched.cases_forest <- cbind(matches, forest_yT2000, forest_yT2021, forest_yC2000, forest_yC2021, carbon_yt, carbon_yC)
 
 # Organize control data
 
-``` r
-# control_pre matching. Use the entire dataset to define the control group before matching to understand baseline conditions.
-Control <- data[data[,type_gov] %in% 0, ]
-control_pre_forest_2020 =sum(Control$Fores_2000)
-control_pre_forest_2021 =sum(Control$Fores_2021)
+    # control_pre matching. Use the entire dataset to define the control group before matching to understand baseline conditions.
+    Control <- data[data[,type_gov] %in% 0, ]
+    control_pre_forest_2020 =sum(Control$Fores_2000)
+    control_pre_forest_2021 =sum(Control$Fores_2021)
 
-# Calculate the proportion of forest pixels that remained unchanged in the control group pre-matching.
-Prop_noloss_forest_control_pre= (control_pre_forest_2021/control_pre_forest_2020)*100
-# Calculate the proportion of forest loss in the control group pre-matching.
-Prop_forest_control_pre= 100-Prop_noloss_forest_control_pre
+    # Calculate the proportion of forest pixels that remained unchanged in the control group pre-matching.
+    Prop_noloss_forest_control_pre= (control_pre_forest_2021/control_pre_forest_2020)*100
+    # Calculate the proportion of forest loss in the control group pre-matching.
+    Prop_forest_control_pre= 100-Prop_noloss_forest_control_pre
 
-# Estimate confidence intervals for forest loss proportion in the control group pre-matching.
-# The DescTools::BinomCI function computes confidence intervals for binomial proportions, providing a range of values within which the true proportion is likely to lie.https://rdrr.io/cran/DescTools/man/BinomCI.html
-binomial_test_control_pre<- 100* (1 - DescTools::BinomCI(x= control_pre_forest_2021, n= length(Control$Fores_2000), 
-                                                           conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
-lower_def_control_pre<- min(binomial_test_control_pre[c("lwr.ci", "upr.ci")])
-upper_def_control_pre<- max(binomial_test_control_pre[c("lwr.ci", "upr.ci")])
-    
-# control_pos matching. Define the control group from the data after matching analysis.
-control_pos_forest_2020 = sum(matched.cases_forest$forest_yC2000)
-control_pos_forest_2021 = sum(matched.cases_forest$forest_yC2021)
+    # Estimate confidence intervals for forest loss proportion in the control group pre-matching.
+    # The DescTools::BinomCI function computes confidence intervals for binomial proportions, providing a range of values within which the true proportion is likely to lie.https://rdrr.io/cran/DescTools/man/BinomCI.html
+    binomial_test_control_pre<- 100* (1 - DescTools::BinomCI(x= control_pre_forest_2021, n= length(Control$Fores_2000), 
+                                                               conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
+    lower_def_control_pre<- min(binomial_test_control_pre[c("lwr.ci", "upr.ci")])
+    upper_def_control_pre<- max(binomial_test_control_pre[c("lwr.ci", "upr.ci")])
+        
+    # control_pos matching. Define the control group from the data after matching analysis.
+    control_pos_forest_2020 = sum(matched.cases_forest$forest_yC2000)
+    control_pos_forest_2021 = sum(matched.cases_forest$forest_yC2021)
 
-# Calculate the proportion of forest pixels that remained unchanged in the control group pos-matching.
-Prop_noloss_forest_control_pos= (control_pos_forest_2021/control_pos_forest_2020)*100
+    # Calculate the proportion of forest pixels that remained unchanged in the control group pos-matching.
+    Prop_noloss_forest_control_pos= (control_pos_forest_2021/control_pos_forest_2020)*100
 
-# Calculate the proportion of forest loss in the control group pos-matching.
-Prop_forest_control_pos= 100-Prop_noloss_forest_control_pos
-  
+    # Calculate the proportion of forest loss in the control group pos-matching.
+    Prop_forest_control_pos= 100-Prop_noloss_forest_control_pos
+      
 
-# Estimate confidence intervals for forest loss proportion in the control group pos-matching. 
-binomial_test_control_pos<- 100* (1 - DescTools::BinomCI(x= control_pos_forest_2021, n= length(matched.cases_forest$forest_yT2000), 
-                                                         conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
-lower_def_control_pos<- min(binomial_test_control_pos[c("lwr.ci", "upr.ci")])
-upper_def_control_pos<- max(binomial_test_control_pos[c("lwr.ci", "upr.ci")])
-```
+    # Estimate confidence intervals for forest loss proportion in the control group pos-matching. 
+    binomial_test_control_pos<- 100* (1 - DescTools::BinomCI(x= control_pos_forest_2021, n= length(matched.cases_forest$forest_yT2000), 
+                                                             conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
+    lower_def_control_pos<- min(binomial_test_control_pos[c("lwr.ci", "upr.ci")])
+    upper_def_control_pos<- max(binomial_test_control_pos[c("lwr.ci", "upr.ci")])
 
 # Organize treatment data
 
-``` r
-# Define the treatment group from the data after matching analysis.
-treatment_forest_2020 = sum(matched.cases_forest$forest_yT2000)
-treatment_forest_2021 = sum(matched.cases_forest$forest_yT2021) 
-  
-# Calculate the proportion of forest pixels that remained unchanged in the treatment group pos-matching.
-Prop_noloss_forest_treatment = (treatment_forest_2021 / treatment_forest_2020) * 100
+    # Define the treatment group from the data after matching analysis.
+    treatment_forest_2020 = sum(matched.cases_forest$forest_yT2000)
+    treatment_forest_2021 = sum(matched.cases_forest$forest_yT2021) 
+      
+    # Calculate the proportion of forest pixels that remained unchanged in the treatment group pos-matching.
+    Prop_noloss_forest_treatment = (treatment_forest_2021 / treatment_forest_2020) * 100
 
-# Calculate the proportion of forest loss in the treatment group pos-matching.
-Prop_forest_treatment = 100 - Prop_noloss_forest_treatment
+    # Calculate the proportion of forest loss in the treatment group pos-matching.
+    Prop_forest_treatment = 100 - Prop_noloss_forest_treatment
 
-# Estimate confidence intervals for forest loss proportion in the treatment group pos-matching. 
-binomial_test_treat<- 100* (1 - DescTools::BinomCI(x= treatment_forest_2021, n= length(matched.cases_forest$forest_yT2000), 
-                                                   conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
+    # Estimate confidence intervals for forest loss proportion in the treatment group pos-matching. 
+    binomial_test_treat<- 100* (1 - DescTools::BinomCI(x= treatment_forest_2021, n= length(matched.cases_forest$forest_yT2000), 
+                                                       conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
 
-# Estimate confidence intervals for forest loss proportion in the treatment group pos-matching.
-lower_def_treat<- min(binomial_test_treat[c("lwr.ci", "upr.ci")])
-upper_def_treat<- max(binomial_test_treat[c("lwr.ci", "upr.ci")])
-```
+    # Estimate confidence intervals for forest loss proportion in the treatment group pos-matching.
+    lower_def_treat<- min(binomial_test_treat[c("lwr.ci", "upr.ci")])
+    upper_def_treat<- max(binomial_test_treat[c("lwr.ci", "upr.ci")])
 
 # Estimation of treatment significance - governance type
 
-``` r
-# Model to assess changes in forest status from 2000 to 2021 as a function of governance type and selected variables.
+    # Model to assess changes in forest status from 2000 to 2021 as a function of governance type and selected variables.
 
-sign_form_treatment<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov, "+"), paste(selected_variables, collapse= "+")))
-  
-# Fit a glm to the matched data to evaluate the effect of governance and other covariates on forest status.
-Model_M_forest = glm( sign_form_treatment , data = y ,family = binomial)
-Model_M_forest_deviance<- deviance(Model_M_forest)
-Model_M_forest_AIC<- extractAIC(Model_M_forest)[2]
-Model_M_forest_sum<- summary(Model_M_forest)
-  
-# Fit a model focused on forest changes from 2000 to 2021 as influenced by governance type alone, simplifying the influence of other variables.
-formula_forest2000_2021<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov)))
-Model_M_forest_2000_2021 = glm(formula_forest2000_2021, data = y ,family = binomial)
-Model_M_forest_2000_2021_deviance<- deviance(Model_M_forest_2000_2021)
-Model_M_forest_2000_2021_AIC<- extractAIC(Model_M_forest_2000_2021)[2]
-Model_M_forest_2000_2021_sum <- summary(Model_M_forest_2000_2021)
-sign_Model_M_forest_2000_2021_sum<- Model_M_forest_2000_2021_sum$coefficients[2,4]
+    sign_form_treatment<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov, "+"), paste(selected_variables, collapse= "+")))
+      
+    # Fit a glm to the matched data to evaluate the effect of governance and other covariates on forest status.
+    Model_M_forest = glm( sign_form_treatment , data = y ,family = binomial)
+    Model_M_forest_deviance<- deviance(Model_M_forest)
+    Model_M_forest_AIC<- extractAIC(Model_M_forest)[2]
+    Model_M_forest_sum<- summary(Model_M_forest)
+      
+    # Fit a model focused on forest changes from 2000 to 2021 as influenced by governance type alone, simplifying the influence of other variables.
+    formula_M_forest_2000_2021<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov)))
+    Model_M_forest_2000_2021 = glm(formula_M_forest_2000_2021, data = y ,family = binomial)
+    Model_M_forest_2000_2021_deviance<- deviance(Model_M_forest_2000_2021)
+    Model_M_forest_2000_2021_AIC<- extractAIC(Model_M_forest_2000_2021)[2]
+    Model_M_forest_2000_2021_sum <- summary(Model_M_forest_2000_2021)
+    sign_Model_M_forest_2000_2021_sum<- Model_M_forest_2000_2021_sum$coefficients[2,4]
 
-# Analyze the impact of governance on the deforestation rate, examining if governance influences the likelihood of deforestation.
-y<- y %>%  dplyr::mutate(deforest= dplyr::if_else(Fores_2000 ==1 & Fores_2021 == 0, 1, 0))
-formula_deforest2000_2021<- as.formula(  paste0("deforest ~", type_gov) )
-  Model_M_deforest_2000_2021 = glm(formula_deforest2000_2021, data = y ,family = binomial)
-  Model_M_deforest_2000_2021_deviance<- deviance(Model_M_deforest_2000_2021)
-  Model_M_deforest_2000_2021_AIC<- extractAIC(Model_M_deforest_2000_2021)[2]
-  Model_M_deforest_2000_2021_sum <- summary(Model_M_deforest_2000_2021)
-  sign_Model_M_deforest_2000_2021_sum<- Model_M_deforest_2000_2021_sum$coefficients[2,4]
-  
+    # Fit a glm to the matched data to evaluate the effect of governance and other covariates on forest status.
+    formula_M_forest_covs<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov, "+"), paste(selected_variables, collapse= "+")))
+    Model_M_forest_covs = glm( formula_M_forest_covs , data = y ,family = binomial)
+    Model_M_forest_covs_deviance<- deviance(Model_M_forest_covs)
+    Model_M_forest_covs_AIC<- extractAIC(Model_M_forest_covs)[2]
+    Model_M_forest_covs_sum<- summary(Model_M_forest_covs)
+    sign_Model_M_forest_covs_sum<- Model_M_forest_covs_sum$coefficients[2,4]
 
-sign_form_treatment; formula_forest2000_2021; formula_deforest2000_2021
-  
-# Organize forest analysis data
-# This table summarizes forest data for treatment and control groups pre- and post-matching, detailing forest loss, non-loss proportions, their confidence intervals, and statistical significance
-summary_forest<- data.frame(fd= c("treatment", "control_pre", "control_pos"),
-                              forest_2000_2020= c(treatment_forest_2020 , control_pre_forest_2020, control_pos_forest_2020),
-                              forest_2000_2021= c(treatment_forest_2021 , control_pre_forest_2021, control_pos_forest_2021),
-                              forest_prop_noloss= c(Prop_noloss_forest_treatment , Prop_noloss_forest_control_pre, Prop_noloss_forest_control_pos),
-                              forest_prop_loss= c(Prop_forest_treatment , Prop_forest_control_pre, Prop_forest_control_pos),
-                              low_interval= c(lower_def_treat, lower_def_control_pre, lower_def_control_pos ), 
-                              upper_interval= c(upper_def_treat, upper_def_control_pre, upper_def_control_pos ),
-                              zval_forest_2000_2021 = c(sign_Model_M_forest_2000_2021_sum, NA, NA),
-                              zval_deforest_2000_2021 = c(sign_Model_M_deforest_2000_2021_sum, NA, NA)  ) %>% 
-    dplyr::mutate(type= type_gov, fd= factor(fd, levels=  c("treatment", "control_pos", "control_pre"))) %>% 
-      dplyr::mutate(sign_forest_2000_2021= sapply(.$zval_forest_2000_2021, function(x) {
-      if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"} else {""} })  ) %>% 
-    dplyr::mutate(sign_deforest_2000_2021= sapply(.$zval_deforest_2000_2021, function(x) {
-      if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"}  else {""} } )  )
-```
+    formula_M_forest_2000_2021; formula_M_forest_covs; 
+      
+    # Organize forest analysis data
+    # This table summarizes forest data for treatment and control groups pre- and post-matching, detailing forest loss, non-loss proportions, their confidence intervals, and statistical significance
+    summary_forest<- data.frame(fd= c("treatment", "control_pre", "control_pos"),
+                                  forest_2000_2020= c(treatment_forest_2020 , control_pre_forest_2020, control_pos_forest_2020),
+                                  forest_2000_2021= c(treatment_forest_2021 , control_pre_forest_2021, control_pos_forest_2021),
+                                  forest_prop_noloss= c(Prop_noloss_forest_treatment , Prop_noloss_forest_control_pre, Prop_noloss_forest_control_pos),
+                                  forest_prop_loss= c(Prop_forest_treatment , Prop_forest_control_pre, Prop_forest_control_pos),
+                                  low_interval= c(lower_def_treat, lower_def_control_pre, lower_def_control_pos ), 
+                                  upper_interval= c(upper_def_treat, upper_def_control_pre, upper_def_control_pos ),
+                                  zval_M_forest_2000_2021 = c(sign_Model_M_forest_2000_2021_sum, NA, NA)  ) %>% 
+        dplyr::mutate(type= type_gov, fd= factor(fd, levels=  c("treatment", "control_pos", "control_pre"))) %>% 
+          dplyr::mutate(sign_forest_2000_2021= sapply(.$zval_M_forest_2000_2021, function(x) {
+          if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"} else {""} })  )
 
-``` r
-print(summary_forest)
-```
+    print(summary_forest)
 
     ##            fd forest_2000_2020 forest_2000_2021 forest_prop_noloss
     ## 1   treatment              934              717           76.76660
     ## 2 control_pre           245180           233577           95.26756
     ## 3 control_pos              934              768           82.22698
-    ##   forest_prop_loss low_interval upper_interval zval_forest_2000_2021
-    ## 1        23.233405    20.637945       26.04814             0.3232083
-    ## 2         4.732441     4.649102        4.81720                    NA
-    ## 3        17.773019    15.454819       20.35523                    NA
-    ##   zval_deforest_2000_2021 type sign_forest_2000_2021 sign_deforest_2000_2021
-    ## 1             0.003548911 Type                                            **
-    ## 2                      NA Type                                              
-    ## 3                      NA Type
+    ##   forest_prop_loss low_interval upper_interval zval_M_forest_2000_2021 type
+    ## 1        23.233405    20.637945       26.04814               0.3232083   MC
+    ## 2         4.732441     4.649102        4.81720                      NA   MC
+    ## 3        17.773019    15.454819       20.35523                      NA   MC
+    ##   sign_forest_2000_2021
+    ## 1                      
+    ## 2                      
+    ## 3
 
-``` r
-# Plotting forest estimations
-# Define the colors and labels for the plotting
-guide_fill_forest<- list(
-  data.frame(fd= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
-  data.frame(fd= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
-  data.frame(fd= "treatment", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
-) %>% rbind.fill()
+    # Plotting forest estimations
+    # Define the colors and labels for the plotting
+    guide_fill_forest<- list(
+      data.frame(fd= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
+      data.frame(fd= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
+      data.frame(fd= "treatment", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
+    ) %>% rbind.fill()
 
-guide_xaxis_forest <- list(
-  data.frame(fd= "control_pre", label_x= "Control preMatching" ),
-  data.frame(fd= "control_pos", label_x = "Control posMatching" ),
-  data.frame(fd= "treatment", label_x = "Treatment" )
-) %>% rbind.fill()
+    guide_xaxis_forest <- list(
+      data.frame(fd= "control_pre", label_x= "Control preMatching" ),
+      data.frame(fd= "control_pos", label_x = "Control posMatching" ),
+      data.frame(fd= "treatment", label_x = "Treatment" )
+    ) %>% rbind.fill()
 
-y_axis_title_result_forest<- "Forest loss (%)"
-x_axis_title_result_forest<- type_gov
-legend_title_result_forest<- ""
-plot_title_result_forest<- paste("Forests", type_gov)
+    y_axis_title_result_forest<- "Forest loss (%)"
+    x_axis_title_result_forest<- type_gov
+    legend_title_result_forest<- ""
+    plot_title_result_forest<- paste("Forests", type_gov)
 
-dataplot_forest<- summary_forest %>%
-  dplyr::mutate(fd= factor( fd, levels = unique(.$fd) )) %>% 
-  list(guide_fill_forest, guide_xaxis_forest) %>% plyr::join_all() %>% 
-  dplyr::mutate(
-    label_fill= factor(label_fill, unique(guide_fill_forest$label_fill)),
-    label_x= factor(label_x, levels= unique(guide_xaxis_forest$label_x))
-  )
+    dataplot_forest<- summary_forest %>%
+      dplyr::mutate(fd= factor( fd, levels = unique(.$fd) )) %>% 
+      list(guide_fill_forest, guide_xaxis_forest) %>% plyr::join_all() %>% 
+      dplyr::mutate(
+        label_fill= factor(label_fill, unique(guide_fill_forest$label_fill)),
+        label_x= factor(label_x, levels= unique(guide_xaxis_forest$label_x))
+      )
 
-y_pos<- max(dataplot_forest$upper_interval)+1;
+    y_pos<- max(dataplot_forest$upper_interval)+1;
 
-# plot the proportion of forest loss 
-plot_forest<- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss , fill= label_fill))+
-  geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-  geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-  xlab(x_axis_title_result_forest)+ylab(y_axis_title_result_forest)+
-  scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
-  scale_fill_manual(legend_title_result_forest,  values = setNames(guide_fill_forest$color_fill ,guide_fill_forest$label_fill) )+
-  theme_minimal()+
-  theme(legend.position = "bottom",
-        axis.text.x  = element_blank(),
-        axis.line.y = element_line(color = "black"),
-        axis.line.x = element_line(color = "black"))
-```
+    # plot the proportion of forest loss 
+    plot_forest<- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss , fill= label_fill))+
+      geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
+      geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
+                    width = 0.1, position =  position_dodge(width  = .8), color = "black")+
+      xlab(x_axis_title_result_forest)+ylab(y_axis_title_result_forest)+
+      scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
+      scale_fill_manual(legend_title_result_forest,  values = setNames(guide_fill_forest$color_fill ,guide_fill_forest$label_fill) )+
+      theme_minimal()+
+      theme(legend.position = "bottom",
+            axis.text.x  = element_blank(),
+            axis.line.y = element_line(color = "black"),
+            axis.line.x = element_line(color = "black"))
 
-``` r
-print(plot_forest)
-```
+    print(plot_forest)
 
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-43-1.png)<!-- -->
+![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-44-1.png)
 
-``` r
-# Calculate the delta of forest loss for labeling on the plot
-max_forest_summary<- summary_forest$upper_interval %>%  {max(., na.rm = T)+abs(sd(.))} # valor maximo barra
-ylimits_forest_summary<- c(0, max_forest_summary)
+    # Calculate the delta of forest loss for labeling on the plot
+    max_forest_summary<- summary_forest$upper_interval %>%  {max(., na.rm = T)+abs(sd(.))} # valor maximo barra
+    ylimits_forest_summary<- c(0, max_forest_summary)
 
-# plot the proportion of forest loss   with significance annotations
+    # plot the proportion of forest loss   with significance annotations
 
-plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss , fill= label_fill))+
-  geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-  geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-  geom_signif(y_position = y_pos, xmin = c(2.5-0.4), xmax = c(2.5+0.4), tip_length = c(0.01, 0.01), size=0.3,   annotation = dataplot_forest$sign_forest_2000_2021[1] )+
-xlab(x_axis_title_result_forest)+ylab(y_axis_title_result_forest)+
-  scale_y_continuous(limits = ylimits_forest_summary, labels = function(x) paste0(x, "%")) +
-  scale_fill_manual(legend_title_result_forest,  values = setNames(guide_fill_forest$color_fill ,guide_fill_forest$label_fill) )+
-  theme_minimal()+
-  theme(legend.position = "bottom",
-        axis.text.x  = element_blank(),
-        axis.line.y = element_line(color = "black"),
-        axis.line.x = element_line(color = "black"))
-```
+    plot_forest_sign <- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss , fill= label_fill))+
+      geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
+      geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
+                    width = 0.1, position =  position_dodge(width  = .8), color = "black")+
+      geom_signif(y_position = y_pos, xmin = c(2.5-0.4), xmax = c(2.5+0.4), tip_length = c(0.01, 0.01), size=0.3,   annotation = dataplot_forest$sign_forest_2000_2021[1] )+
+    xlab(x_axis_title_result_forest)+ylab(y_axis_title_result_forest)+
+      scale_y_continuous(limits = ylimits_forest_summary, labels = function(x) paste0(x, "%")) +
+      scale_fill_manual(legend_title_result_forest,  values = setNames(guide_fill_forest$color_fill ,guide_fill_forest$label_fill) )+
+      theme_minimal()+
+      theme(legend.position = "bottom",
+            axis.text.x  = element_blank(),
+            axis.line.y = element_line(color = "black"),
+            axis.line.x = element_line(color = "black"))
 
-``` r
-print(plot_forest_sign)
-```
+    print(plot_forest_sign)
 
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-45-1.png)<!-- -->
+![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-46-1.png)
 
-``` r
-########### Carbon effect
+    ########### Carbon effect
 
-# Pre-matching control
-control_pre_carbon_2000 = dplyr::filter(Control, Fores_2000 == 1)$Carbon_pixel
-control_pre_carbon_2021 = dplyr::filter(Control, Fores_2021 == 1)$Carbon_pixel
-  
-# Identify carbon pixel data associated with deforestation from 2000 to 2021 from original data
-loss_pre_carbon<- dplyr::filter(Control, Fores_2000 == 1 & Fores_2021 == 0 )$Carbon_pixel
-  
-# Calculate metrics about carbon in deforestation pixels.
-mean_pre_carbon<- mean(loss_pre_carbon)
-sum_pre_carbon<- sum(loss_pre_carbon)
+    # Pre-matching control
+    control_pre_carbon_2000 = dplyr::filter(Control, Fores_2000 == 1)$Carbon_pixel
+    control_pre_carbon_2021 = dplyr::filter(Control, Fores_2021 == 1)$Carbon_pixel
+      
+    # Identify carbon pixel data associated with deforestation from 2000 to 2021 from original data
+    loss_pre_carbon<- dplyr::filter(Control, Fores_2000 == 1 & Fores_2021 == 0 )$Carbon_pixel
+      
+    # Calculate metrics about carbon in deforestation pixels.
+    mean_pre_carbon<- mean(loss_pre_carbon)
+    sum_pre_carbon<- sum(loss_pre_carbon)
 
-sum_control_pre_carbon_2000<- sum(control_pre_carbon_2000, na.rm=T)
-sum_control_pre_carbon_2021<- sum(control_pre_carbon_2021, na.rm=T)
+    sum_control_pre_carbon_2000<- sum(control_pre_carbon_2000, na.rm=T)
+    sum_control_pre_carbon_2021<- sum(control_pre_carbon_2021, na.rm=T)
 
-mean_control_pre_carbon_2000<- mean(control_pre_carbon_2000, na.rm=T)
-mean_control_pre_carbon_2021<- mean(control_pre_carbon_2021, na.rm=T)
-  
-  
-# Calculate the proportion of carbon retained and lost in pixels with forests before matching.
-Prop_noloss_carbon_control_pre<- (sum_control_pre_carbon_2021/sum_control_pre_carbon_2000)*100
-Prop_carbon_control_pre<- 100-Prop_noloss_carbon_control_pre
-  
-# Estimate confidence intervals for carbon loss proportion in the control group pre-matching.
-binomial_test_losscarb_control_pre<- 100* (1 - DescTools::BinomCI(x= sum_control_pre_carbon_2021, n= sum(control_pre_carbon_2000, na.rm=T), 
-                                                           conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
+    mean_control_pre_carbon_2000<- mean(control_pre_carbon_2000, na.rm=T)
+    mean_control_pre_carbon_2021<- mean(control_pre_carbon_2021, na.rm=T)
+      
+      
+    # Calculate the proportion of carbon retained and lost in pixels with forests before matching.
+    Prop_noloss_carbon_control_pre<- (sum_control_pre_carbon_2021/sum_control_pre_carbon_2000)*100
+    Prop_carbon_control_pre<- 100-Prop_noloss_carbon_control_pre
+      
+    # Estimate confidence intervals for carbon loss proportion in the control group pre-matching.
+    binomial_test_losscarb_control_pre<- 100* (1 - DescTools::BinomCI(x= sum_control_pre_carbon_2021, n= sum(control_pre_carbon_2000, na.rm=T), 
+                                                               conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
 
-lower_losscarb_control_pre<- min(binomial_test_losscarb_control_pre[c("lwr.ci", "upr.ci")])
-upper_losscarb_control_pre<- max(binomial_test_losscarb_control_pre[c("lwr.ci", "upr.ci")])
+    lower_losscarb_control_pre<- min(binomial_test_losscarb_control_pre[c("lwr.ci", "upr.ci")])
+    upper_losscarb_control_pre<- max(binomial_test_losscarb_control_pre[c("lwr.ci", "upr.ci")])
 
-# Organize data
-dispersion_pre_carbon_effect <- list(t1= control_pre_carbon_2000, t2= control_pre_carbon_2021, loss= loss_pre_carbon) %>% 
-    {lapply(names(.), function(x) data.frame(level= x, value= .[[x]]))} %>% rbind.fill() %>% 
-    dplyr::mutate(level= factor(level, levels= c("t1", "t2", "loss")), treatment= "control_pre")
-  
-  
+    # Organize data
+    dispersion_pre_carbon_effect <- list(t1= control_pre_carbon_2000, t2= control_pre_carbon_2021, loss= loss_pre_carbon) %>% 
+        {lapply(names(.), function(x) data.frame(level= x, value= .[[x]]))} %>% rbind.fill() %>% 
+        dplyr::mutate(level= factor(level, levels= c("t1", "t2", "loss")), treatment= "control_pre")
+      
+      
 
-##  Pos-matching control
-  control_pos_carbon_2000 = dplyr::filter(matched.cases_forest, forest_yC2000 == 1)$carbon_yC
-  control_pos_carbon_2021 = dplyr::filter(matched.cases_forest, forest_yC2021 == 1)$carbon_yC
+    ##  Pos-matching control
+      control_pos_carbon_2000 = dplyr::filter(matched.cases_forest, forest_yC2000 == 1)$carbon_yC
+      control_pos_carbon_2021 = dplyr::filter(matched.cases_forest, forest_yC2021 == 1)$carbon_yC
 
-# Identify carbon pixel data associated with deforestation from 2000 to 2021 from matching data
-loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & forest_yC2021 == 0 )$carbon_yt
-  
+    # Identify carbon pixel data associated with deforestation from 2000 to 2021 from matching data
+    loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & forest_yC2021 == 0 )$carbon_yt
+      
 
-# Calculate metrics about carbon in deforestation pixels.
-  mean_pos_carbon<- mean(loss_pos_carbon)
-  sum_pos_carbon<- sum(loss_pos_carbon)
+    # Calculate metrics about carbon in deforestation pixels.
+      mean_pos_carbon<- mean(loss_pos_carbon)
+      sum_pos_carbon<- sum(loss_pos_carbon)
 
-  sum_control_pos_carbon_2000<- sum(control_pos_carbon_2000, na.rm=T)
-  sum_control_pos_carbon_2021<- sum(control_pos_carbon_2021, na.rm=T)
-  
-  mean_control_pos_carbon_2000<- mean(control_pos_carbon_2000, na.rm=T)
-  mean_control_pos_carbon_2021<- mean(control_pos_carbon_2021, na.rm=T)
-  
-  # Calculate the proportion of carbon retained and lost in pixels with forests after matching.
-  Prop_noloss_carbon_control_pos<- (sum_control_pos_carbon_2021/sum_control_pos_carbon_2000)*100
-  Prop_carbon_control_pos<- 100-Prop_noloss_carbon_control_pos
-  
-  
-  # Estimate confidence intervals for carbon loss proportion in the control group pos-matching.
-  binomial_test_losscarb_control_pos<- 100* (1 - DescTools::BinomCI(x= sum_control_pos_carbon_2021, n= sum(control_pos_carbon_2000, na.rm=T), 
-                                                                    conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
-  
-  lower_losscarb_control_pos<- min(binomial_test_losscarb_control_pos[c("lwr.ci", "upr.ci")])
-  upper_losscarb_control_pos<- max(binomial_test_losscarb_control_pos[c("lwr.ci", "upr.ci")])
-  
-  # Organize data
-  dispersion_pos_carbon_effect <- list(t1= control_pos_carbon_2000, t2= control_pos_carbon_2021, loss= loss_pos_carbon) %>% 
-    {lapply(names(.), function(x) data.frame(level= x, value= .[[x]]))} %>% rbind.fill() %>% 
-    dplyr::mutate(level= factor(level, levels= c("t1", "t2", "loss")), treatment= "control_pos")
-  
-  
-##  Pos-matching treatment
-  treatment_pos_carbon_2000 = dplyr::filter(matched.cases_forest, forest_yT2000 == 1)$carbon_yt
-  treatment_pos_carbon_2021 = dplyr::filter(matched.cases_forest, forest_yT2021 == 1)$carbon_yt
-  
-  # Calculate metrics about carbon in deforestation pixels.
-  mean_pos_carbon<- mean(loss_pos_carbon)
-  sum_pos_carbon<- sum(loss_pos_carbon)
-  
-  sum_treatment_pos_carbon_2000<- sum(treatment_pos_carbon_2000, na.rm=T)
-  sum_treatment_pos_carbon_2021<- sum(treatment_pos_carbon_2021, na.rm=T)
-  
-  mean_treatment_pos_carbon_2000<- mean(treatment_pos_carbon_2000, na.rm=T)
-  mean_treatment_pos_carbon_2021<- mean(treatment_pos_carbon_2021, na.rm=T)
+      sum_control_pos_carbon_2000<- sum(control_pos_carbon_2000, na.rm=T)
+      sum_control_pos_carbon_2021<- sum(control_pos_carbon_2021, na.rm=T)
+      
+      mean_control_pos_carbon_2000<- mean(control_pos_carbon_2000, na.rm=T)
+      mean_control_pos_carbon_2021<- mean(control_pos_carbon_2021, na.rm=T)
+      
+      # Calculate the proportion of carbon retained and lost in pixels with forests after matching.
+      Prop_noloss_carbon_control_pos<- (sum_control_pos_carbon_2021/sum_control_pos_carbon_2000)*100
+      Prop_carbon_control_pos<- 100-Prop_noloss_carbon_control_pos
+      
+      
+      # Estimate confidence intervals for carbon loss proportion in the control group pos-matching.
+      binomial_test_losscarb_control_pos<- 100* (1 - DescTools::BinomCI(x= sum_control_pos_carbon_2021, n= sum(control_pos_carbon_2000, na.rm=T), 
+                                                                        conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
+      
+      lower_losscarb_control_pos<- min(binomial_test_losscarb_control_pos[c("lwr.ci", "upr.ci")])
+      upper_losscarb_control_pos<- max(binomial_test_losscarb_control_pos[c("lwr.ci", "upr.ci")])
+      
+      # Organize data
+      dispersion_pos_carbon_effect <- list(t1= control_pos_carbon_2000, t2= control_pos_carbon_2021, loss= loss_pos_carbon) %>% 
+        {lapply(names(.), function(x) data.frame(level= x, value= .[[x]]))} %>% rbind.fill() %>% 
+        dplyr::mutate(level= factor(level, levels= c("t1", "t2", "loss")), treatment= "control_pos")
+      
+      
+    ##  Pos-matching treatment
+      treatment_pos_carbon_2000 = dplyr::filter(matched.cases_forest, forest_yT2000 == 1)$carbon_yt
+      treatment_pos_carbon_2021 = dplyr::filter(matched.cases_forest, forest_yT2021 == 1)$carbon_yt
+      
+      # Calculate metrics about carbon in deforestation pixels.
+      mean_pos_carbon<- mean(loss_pos_carbon)
+      sum_pos_carbon<- sum(loss_pos_carbon)
+      
+      sum_treatment_pos_carbon_2000<- sum(treatment_pos_carbon_2000, na.rm=T)
+      sum_treatment_pos_carbon_2021<- sum(treatment_pos_carbon_2021, na.rm=T)
+      
+      mean_treatment_pos_carbon_2000<- mean(treatment_pos_carbon_2000, na.rm=T)
+      mean_treatment_pos_carbon_2021<- mean(treatment_pos_carbon_2021, na.rm=T)
 
-  
-  loss_treatment_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yT2000 == 1 & forest_yT2021 == 0 )$carbon_yt
-  mean_treatment_pos_carbon<- mean(loss_treatment_pos_carbon)
-  sum_treatment_pos_carbon<- sum(loss_treatment_pos_carbon)
-  
-  # Calculate the proportion of carbon retained and lost in pixels with forests after matching.
-  Prop_noloss_carbon_treatment_pos<- (sum_treatment_pos_carbon_2021/sum_treatment_pos_carbon_2000)*100
-  Prop_carbon_treatment_pos<- 100-Prop_noloss_carbon_treatment_pos
-  
-  
-  # Estimate confidence intervals for carbon loss proportion in the treatment group pos-matching.
-  binomial_test_losscarb_treatment_pos<- 100* (1 - DescTools::BinomCI(x= sum_treatment_pos_carbon_2021, n= sum(treatment_pos_carbon_2000, na.rm=T), 
-                                                                    conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
-  
-  lower_losscarb_treatment_pos<- min(binomial_test_losscarb_treatment_pos[c("lwr.ci", "upr.ci")])
-  upper_losscarb_treatment_pos<- max(binomial_test_losscarb_treatment_pos[c("lwr.ci", "upr.ci")])
-  
-  # Organize data
-  dispersion_carbon_effect <- list(t1= treatment_pos_carbon_2000, t2= treatment_pos_carbon_2021, loss= loss_pos_carbon) %>% 
-    {lapply(names(.), function(x) data.frame(level= x, value= .[[x]]))} %>% rbind.fill() %>% 
-    dplyr::mutate(level= factor(level, levels= c("t1", "t2", "loss")), treatment= "treatment_pos")
+      
+      loss_treatment_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yT2000 == 1 & forest_yT2021 == 0 )$carbon_yt
+      mean_treatment_pos_carbon<- mean(loss_treatment_pos_carbon)
+      sum_treatment_pos_carbon<- sum(loss_treatment_pos_carbon)
+      
+      # Calculate the proportion of carbon retained and lost in pixels with forests after matching.
+      Prop_noloss_carbon_treatment_pos<- (sum_treatment_pos_carbon_2021/sum_treatment_pos_carbon_2000)*100
+      Prop_carbon_treatment_pos<- 100-Prop_noloss_carbon_treatment_pos
+      
+      
+      # Estimate confidence intervals for carbon loss proportion in the treatment group pos-matching.
+      binomial_test_losscarb_treatment_pos<- 100* (1 - DescTools::BinomCI(x= sum_treatment_pos_carbon_2021, n= sum(treatment_pos_carbon_2000, na.rm=T), 
+                                                                        conf.level = 0.95, method = "wilson" )) %>% as.data.frame()
+      
+      lower_losscarb_treatment_pos<- min(binomial_test_losscarb_treatment_pos[c("lwr.ci", "upr.ci")])
+      upper_losscarb_treatment_pos<- max(binomial_test_losscarb_treatment_pos[c("lwr.ci", "upr.ci")])
+      
+      # Organize data
+      dispersion_carbon_effect <- list(t1= treatment_pos_carbon_2000, t2= treatment_pos_carbon_2021, loss= loss_pos_carbon) %>% 
+        {lapply(names(.), function(x) data.frame(level= x, value= .[[x]]))} %>% rbind.fill() %>% 
+        dplyr::mutate(level= factor(level, levels= c("t1", "t2", "loss")), treatment= "treatment_pos")
 
-  # Organize carbon analysis data
-  # This table summarizes carbon data for treatment and control groups pre- and post-matching, detailing carbon loss, non-loss proportions, their confidence intervals, and statistical significance. It provides an overview of carbon dynamics in response to forest management and deforestation across different periods and groups.
-  summary_carbon<- data.frame(fd= c("treatment", "control_pos", "control_pre"),
-                              sum_carbon_t1= c(sum_treatment_pos_carbon_2000, sum_control_pos_carbon_2000 , sum_control_pre_carbon_2000),
-                              sum_carbon_t2= c(sum_treatment_pos_carbon_2021, sum_control_pos_carbon_2021 , sum_control_pre_carbon_2021),
-                              sum_carbon= c(sum_treatment_pos_carbon, sum_pos_carbon, sum_pre_carbon),
-                              sum_carbon_prop_noloss= c(Prop_noloss_carbon_treatment_pos, Prop_noloss_carbon_control_pos , Prop_noloss_carbon_control_pre),
-                              sum_carbon_prop_loss= c(Prop_carbon_treatment_pos, Prop_carbon_control_pos , Prop_carbon_control_pre),
-                              mean_carbon_t1= c(mean_treatment_pos_carbon_2000, mean_control_pos_carbon_2000 , mean_control_pre_carbon_2000),
-                              mean_carbon_t2= c(mean_treatment_pos_carbon_2021, mean_control_pos_carbon_2021 , mean_control_pre_carbon_2021),
-                              mean_pixel = c(mean_treatment_pos_carbon, mean_pos_carbon, mean_pre_carbon),
-                              low_interval= c(lower_losscarb_treatment_pos, lower_losscarb_control_pos, lower_losscarb_control_pre), 
-                              upper_interval= c(upper_losscarb_treatment_pos, upper_losscarb_control_pos, upper_losscarb_control_pre),
-                              zval_forest_2000_2021 = c(sign_Model_M_forest_2000_2021_sum, NA, NA),
-                              zval_deforest_2000_2021 = c(sign_Model_M_deforest_2000_2021_sum, NA, NA)  ) %>%                         
-    dplyr::mutate(type= type_gov, fd= factor(fd, levels=  c("treatment", "control_pos", "control_pre"))) %>% 
-    dplyr::mutate(sign_forest_2000_2021= sapply(.$zval_forest_2000_2021, function(x) {
-      if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"} else {""} })  ) %>% 
-    dplyr::mutate(sign_deforest_2000_2021= sapply(.$zval_deforest_2000_2021, function(x) {
-      if(is.na(x)){""}else if(x<0.001){"***"}else if(x<0.05){"**"}else if(x<0.1){"*"}  else {""} } )  )
-```
+      # Organize carbon analysis data
+        # This table summarizes carbon data for treatment and control groups pre- and post-matching, detailing carbon loss, non-loss proportions, their confidence intervals, and statistical significance.
+      summary_carbon<- data.frame(fd= c("treatment", "control_pos", "control_pre"),
+                                  sum_carbon_t1= c(sum_treatment_pos_carbon_2000, sum_control_pos_carbon_2000 , sum_control_pre_carbon_2000),
+                                  sum_carbon_t2= c(sum_treatment_pos_carbon_2021, sum_control_pos_carbon_2021 , sum_control_pre_carbon_2021),
+                                  sum_carbon= c(sum_treatment_pos_carbon, sum_pos_carbon, sum_pre_carbon),
+                                  sum_carbon_prop_noloss= c(Prop_noloss_carbon_treatment_pos, Prop_noloss_carbon_control_pos , Prop_noloss_carbon_control_pre),
+                                  sum_carbon_prop_loss= c(Prop_carbon_treatment_pos, Prop_carbon_control_pos , Prop_carbon_control_pre),
+                                  mean_carbon_t1= c(mean_treatment_pos_carbon_2000, mean_control_pos_carbon_2000 , mean_control_pre_carbon_2000),
+                                  mean_carbon_t2= c(mean_treatment_pos_carbon_2021, mean_control_pos_carbon_2021 , mean_control_pre_carbon_2021),
+                                  mean_pixel = c(mean_treatment_pos_carbon, mean_pos_carbon, mean_pre_carbon),
+                                  low_interval= c(lower_losscarb_treatment_pos, lower_losscarb_control_pos, lower_losscarb_control_pre), 
+                                  upper_interval= c(upper_losscarb_treatment_pos, upper_losscarb_control_pos, upper_losscarb_control_pre)
+                                  )
 
-``` r
-print(summary_carbon)
-```
+    print(summary_carbon)
 
     ##            fd sum_carbon_t1 sum_carbon_t2 sum_carbon sum_carbon_prop_noloss
     ## 1   treatment      5268.872      4096.003  1172.8689               77.73966
@@ -1087,350 +996,307 @@ print(summary_carbon)
     ## 1            22.260340       5.641191       5.712697   5.404926    21.157527
     ## 2            14.568714       6.040138       6.275517   5.637206    13.672222
     ## 3             2.971774       8.368710       8.523374   5.255198     2.948627
-    ##   upper_interval zval_forest_2000_2021 zval_deforest_2000_2021 type
-    ## 1      23.403573             0.3232083             0.003548911 Type
-    ## 2      15.513425                    NA                      NA Type
-    ## 3       2.995097                    NA                      NA Type
-    ##   sign_forest_2000_2021 sign_deforest_2000_2021
-    ## 1                                            **
-    ## 2                                              
-    ## 3
+    ##   upper_interval
+    ## 1      23.403573
+    ## 2      15.513425
+    ## 3       2.995097
 
-``` r
-# Plotting carbon estimations
-  # Define the colors and labels for the plotting
-  guide_fill_carbon<- list(
-    data.frame(fd= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
-    data.frame(fd= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
-    data.frame(fd= "treatment", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
-  ) %>% rbind.fill()
-  
-  guide_xaxis_carbon <- list(
-    data.frame(fd= "control_pre", label_x= "Control preMatching"),
-    data.frame(fd= "control_pos", label_x= "Control posMatching"),
-    data.frame(fd= "treatment", label_x = "Treatment")
-  ) %>% rbind.fill()
-  
-  y_axis_title_result_carbon<- c(expression(CO[2]~"emissions (%)"))
-  x_axis_title_result_carbon<- type_gov
-  legend_title_result_carbon<- ""
-  plot_title_result_carbon<- paste("Carbon", type_gov)
-  
-  dataplot_carbon<- summary_carbon %>%
-    dplyr::mutate(fd= factor( fd, levels = unique(.$fd) )) %>% 
-    list(guide_fill_carbon, guide_xaxis_carbon) %>% plyr::join_all() %>% 
-    dplyr::mutate( label_fill= factor(label_fill, unique(guide_fill_carbon$label_fill)),
-                   label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x)) )
-  
-  # plot the proportion of carbon loss 
-  plot_loss_carbon_fin<- ggplot(data= dataplot_carbon,  aes(x= label_x, y= sum_carbon_prop_loss , fill= label_fill))+
-    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                  width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-    xlab(x_axis_title_result_carbon)+ylab(y_axis_title_result_carbon)+
-    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
-    scale_fill_manual(legend_title_result_carbon,  values = setNames(guide_fill_carbon$color_fill ,guide_fill_carbon$label_fill) )+
-    theme_minimal()+
-    theme(legend.position = "bottom",
-          axis.text.x  = element_blank(),
-          axis.line.y = element_line(color = "black"),
-          axis.line.x = element_line(color = "black"))
-```
+    # Plotting carbon estimations
+      # Define the colors and labels for the plotting
+      guide_fill_carbon<- list(
+        data.frame(fd= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
+        data.frame(fd= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
+        data.frame(fd= "treatment", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
+      ) %>% rbind.fill()
+      
+      guide_xaxis_carbon <- list(
+        data.frame(fd= "control_pre", label_x= "Control preMatching"),
+        data.frame(fd= "control_pos", label_x= "Control posMatching"),
+        data.frame(fd= "treatment", label_x = "Treatment")
+      ) %>% rbind.fill()
+      
+      y_axis_title_result_carbon<- c(expression(CO[2]~"emissions (%)"))
+      x_axis_title_result_carbon<- type_gov
+      legend_title_result_carbon<- ""
+      plot_title_result_carbon<- paste("Carbon", type_gov)
+      
+      dataplot_carbon<- summary_carbon %>%
+        dplyr::mutate(fd= factor( fd, levels = unique(.$fd) )) %>% 
+        list(guide_fill_carbon, guide_xaxis_carbon) %>% plyr::join_all() %>% 
+        dplyr::mutate( label_fill= factor(label_fill, unique(guide_fill_carbon$label_fill)),
+                       label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x)) )
+      
+      # plot the proportion of carbon loss 
+      plot_loss_carbon_fin<- ggplot(data= dataplot_carbon,  aes(x= label_x, y= sum_carbon_prop_loss , fill= label_fill))+
+        geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
+        geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
+                      width = 0.1, position =  position_dodge(width  = .8), color = "black")+
+        xlab(x_axis_title_result_carbon)+ylab(y_axis_title_result_carbon)+
+        scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
+        scale_fill_manual(legend_title_result_carbon,  values = setNames(guide_fill_carbon$color_fill ,guide_fill_carbon$label_fill) )+
+        theme_minimal()+
+        theme(legend.position = "bottom",
+              axis.text.x  = element_blank(),
+              axis.line.y = element_line(color = "black"),
+              axis.line.x = element_line(color = "black"))
 
-``` r
-print(plot_loss_carbon_fin)
-```
+    print(plot_loss_carbon_fin)
 
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-49-1.png)<!-- -->
+![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-50-1.png)
 
+    ## Plotting carbon and forest estimations summary plot
+      # Define the colors and labels for the plotting
+      y_secondaxis_carbon_summary<- c(expression(CO[2]~"emissions (%)"))
+      legend_label_carbon_summary<- c(expression(CO[2]~"emissions (%)")) # etiqueta de carbon en leyenda
+      color_bar_carbon_summary<- "red" # ancho de barra carbon
+      alpha_bar_carbon_summary<- 0.5 # transparencia barra carbon
+      size_bar_carbon_summary<- 1 # grosor de barra carbon
+      height_bar_carbon_summary<- 1 # altura de barra carbon
+      size_point_carbon_summary<- 3 # grosor de barra carbon
+      
+      
+      # Organize and Prepare Data for Combined Carbon and Forest Plot
+      dataplot_carbon_bars<-   summary_carbon %>% 
+        list(guide_xaxis_forest, guide_fill_forest) %>% join_all() %>% 
+        dplyr::mutate(
+          label_fill= factor(label_fill, unique(guide_fill_forest$label_fill)),
+          label_x= factor(label_x, levels= unique(guide_xaxis_forest$label_x))) %>% 
+        dplyr::select(label_x, sum_carbon_prop_loss, label_fill, sum_carbon_prop_loss ) %>% dplyr::distinct() %>% 
+        group_by(label_x) %>% dplyr::mutate(n_level= n_distinct(label_fill), numeric_level= as.numeric(label_x) ) %>% as.data.frame()
+      
 
-``` r
-  # Arrange the forest and carbon loss plots into a single figure
-  plot_response_sign <- ggpubr::ggarrange(
-    plotlist = list(plot_forest_sign, plot_loss_carbon),  # List of plots to arrange
-    common.legend = TRUE,  # Use a single common legend for all plots
-    legend = "bottom"  # Position the legend at the bottom of the arranged figure
-  )
-```
+      # Calculate Percentage Change in Forest Loss (Delta)
+      delta_summary_forest<- {
+        data_delta<-  dataplot_forest %>% dplyr::filter(!fd %in% "control_pre")
+        denominador<- max( data_delta$forest_prop_loss )
+        numerador<- min( data_delta$forest_prop_loss )
+        delta <- (1-(numerador / denominador)) *100
+        type<- data_delta %>% split(.$label_fill)
+        sentido<- ifelse(  type$Treatment$forest_prop_loss >= type$`Control posMatching`$forest_prop_loss, "red", "darkgreen" )
+        data.frame(label_x= type_gov, delta= delta, color= sentido)
+      }
+      
+    # Annotation for Delta in Forest Loss on the Forest Summary Plot
+      forest_summary_sign_plot<-  plot_forest_sign + 
+        geom_text(x=2.5, y= y_pos, label= paste0(round(delta_summary_forest$delta, 0), "%"), size= 4, vjust= -2.5, color= delta_summary_forest$color)
 
-``` r
-print(plot_response_sign)
-```
+    print(forest_summary_sign_plot)
 
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-53-1.png)<!-- -->
+![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-52-1.png)
 
-``` r
-## Plotting carbon and forest estimations summary plot
-  # Define the colors and labels for the plotting
-  y_secondaxis_carbon_summary<- c(expression(CO[2]~"emissions (%)"))
-  legend_label_carbon_summary<- c(expression(CO[2]~"emissions (%)")) # etiqueta de carbon en leyenda
-  color_bar_carbon_summary<- "red" # ancho de barra carbon
-  alpha_bar_carbon_summary<- 0.5 # transparencia barra carbon
-  size_bar_carbon_summary<- 1 # grosor de barra carbon
-  height_bar_carbon_summary<- 1 # altura de barra carbon
-  size_point_carbon_summary<- 3 # grosor de barra carbon
-  
-  
-  # Organize and Prepare Data for Combined Carbon and Forest Plot
-  dataplot_carbon_bars<-   summary_carbon %>% 
-    list(guide_xaxis_forest, guide_fill_forest) %>% join_all() %>% 
-    dplyr::mutate(
-      label_fill= factor(label_fill, unique(guide_fill_forest$label_fill)),
-      label_x= factor(label_x, levels= unique(guide_xaxis_forest$label_x))) %>% 
-    dplyr::select(label_x, sum_carbon_prop_loss, label_fill, sum_carbon_prop_loss ) %>% dplyr::distinct() %>% 
-    group_by(label_x) %>% dplyr::mutate(n_level= n_distinct(label_fill), numeric_level= as.numeric(label_x) ) %>% as.data.frame()
-  
+     # Create Combined Plot for Carbon Emissions and Forest Loss
+      forest_carbon_summary_sign_plot<-   plot_forest_sign+ ggnewscale::new_scale_fill()+
+        geom_errorbarh(data= dataplot_carbon_bars,
+                       aes(x= label_x, 
+                           xmin= dplyr::if_else(n_level > 1, numeric_level - 0.4, numeric_level - 0.2) , 
+                           xmax= dplyr::if_else(n_level > 1, numeric_level + 0.4, numeric_level + 0.2), y= sum_carbon_prop_loss, group = label_fill, color= color_bar_carbon_summary  ),
+                       height= height_bar_carbon_summary, position = position_dodge(0.9, preserve = 'total'), stat="identity", size= size_bar_carbon_summary, alpha= alpha_bar_carbon_summary )+
+        geom_point(data= dataplot_carbon_bars,
+                   aes(x= label_x, y= sum_carbon_prop_loss,  group= label_fill, color= color_bar_carbon_summary ), alpha=alpha_bar_carbon_summary,
+                   position =  position_dodge(0.9, preserve = 'total') , size= size_point_carbon_summary, shape = 18 )  +
+        scale_color_manual("", labels = legend_label_carbon_summary, values =  color_bar_carbon_summary )  +
+        scale_y_continuous(sec.axis = sec_axis(~., name = y_secondaxis_carbon_summary ), limits = ylimits_forest_summary )+
+        annotate(geom="text", x= 2.5, y= y_pos, label= paste0(round(delta_summary_forest$delta, 0), "%"), size= 4, vjust= -2.5, color= delta_summary_forest$color)
 
-  # Calculate Percentage Change in Forest Loss (Delta)
-  delta_summary_forest<- {
-    data_delta<-  dataplot_forest %>% dplyr::filter(!fd %in% "control_pre")
-    denominador<- max( data_delta$forest_prop_loss )
-    numerador<- min( data_delta$forest_prop_loss )
-    delta <- (1-(numerador / denominador)) *100
-    type<- data_delta %>% split(.$label_fill)
-    sentido<- ifelse(  type$Treatment$forest_prop_loss >= type$`Control posMatching`$forest_prop_loss, "red", "darkgreen" )
-    data.frame(label_x= type_gov, delta= delta, color= sentido)
-  }
-  
-# Annotation for Delta in Forest Loss on the Forest Summary Plot
-  forest_summary_sign_plot<-  plot_forest_sign + 
-    geom_text(x=2.5, y= y_pos, label= paste0(round(delta_summary_forest$delta, 0), "%"), size= 4, vjust= -2.5, color= delta_summary_forest$color)
-```
+    print(forest_carbon_summary_sign_plot)
 
-``` r
-print(forest_summary_sign_plot)
-```
-
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-55-1.png)<!-- -->
-
-``` r
- # Create Combined Plot for Carbon Emissions and Forest Loss
-  forest_carbon_summary_sign_plot<-   plot_forest_sign+ ggnewscale::new_scale_fill()+
-    geom_errorbarh(data= dataplot_carbon_bars,
-                   aes(x= label_x, 
-                       xmin= dplyr::if_else(n_level > 1, numeric_level - 0.4, numeric_level - 0.2) , 
-                       xmax= dplyr::if_else(n_level > 1, numeric_level + 0.4, numeric_level + 0.2), y= sum_carbon_prop_loss, group = label_fill, color= color_bar_carbon_summary  ),
-                   height= height_bar_carbon_summary, position = position_dodge(0.9, preserve = 'total'), stat="identity", size= size_bar_carbon_summary, alpha= alpha_bar_carbon_summary )+
-    geom_point(data= dataplot_carbon_bars,
-               aes(x= label_x, y= sum_carbon_prop_loss,  group= label_fill, color= color_bar_carbon_summary ), alpha=alpha_bar_carbon_summary,
-               position =  position_dodge(0.9, preserve = 'total') , size= size_point_carbon_summary, shape = 18 )  +
-    scale_color_manual("", labels = legend_label_carbon_summary, values =  color_bar_carbon_summary )  +
-    scale_y_continuous(sec.axis = sec_axis(~., name = y_secondaxis_carbon_summary ), limits = ylimits_forest_summary )+
-    annotate(geom="text", x= 2.5, y= y_pos, label= paste0(round(delta_summary_forest$delta, 0), "%"), size= 4, vjust= -2.5, color= delta_summary_forest$color)
-```
-
-``` r
-print(forest_carbon_summary_sign_plot)
-```
-
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-57-1.png)<!-- -->
+![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-54-1.png)
 
 # Plotting carbon disperssion estimations
 
-``` r
-# Define the colors and labels for the plotting
-  
-  guide_fill_carbon_disperssion<- list(
-    data.frame(treatment= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
-    data.frame(treatment= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
-    data.frame(treatment= "treatment_pos", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
-    ) %>% rbind.fill()
-  
-  guide_xaxis_carbon_disperssion<- list(
-    data.frame(level= "t1", label_x= "Forests 2000"),
-    data.frame(level= "t2", label_x= "Forests 2021"),
-    data.frame(level= "loss", label_x = "Forest 2021- Forest 2000")) %>% 
-    rbind.fill()
-  
-  y_axis_title_result_carbon_disperssion<- expression(Tons~of~CO[2]~" by pixel")
-  x_axis_title_result_carbon_disperssion<- "Forest Over Time"
-  legend_title_result_carbon_disperssion<- ""
-  plot_title_result_carbon_disperssion<- paste("Carbon ", type_gov)
-  
-  # Organize data
-  dataplot_carbon_disperssion <- list(dispersion_pre_carbon_effect, 
-                                      dispersion_pos_carbon_effect, 
-                                      dispersion_carbon_effect) %>%
-    rbind.fill() %>% dplyr::mutate(treatment= factor( treatment, levels = unique(.$treatment) )) %>% 
-    list(guide_fill_carbon_disperssion, guide_xaxis_carbon_disperssion) %>% plyr::join_all() %>% 
-    dplyr::mutate(label_x= factor(label_x, unique(guide_xaxis_carbon_disperssion$label_x)),
-                  label_fill= factor(label_fill, unique(guide_fill_carbon_disperssion$label_fill))
-                  )
-  
-  limits_axis_y<- boxplot.stats(dataplot_carbon_disperssion$value)$stats %>% {c(min(.), max(.))}
-  dataplot_carbon_disperssion_t1_t2<- dplyr::filter(dataplot_carbon_disperssion, !level %in% "loss")
-  dataplot_carbon_disperssion_loss<- dplyr::filter(dataplot_carbon_disperssion, level %in% "loss")
-  
-  # plot the disperssion of carbon by pixel between two periods
-  plot_carbon_disperssion_t1_t2<- ggplot(dataplot_carbon_disperssion_t1_t2, aes(x = label_x, y = value, fill= label_fill)) +
-    stat_slab(side = "right", scale = 0.4,show.legend = T,expand = F, 
-              position = position_dodge(width = .8), aes(fill_ramp = stat(level) ), 
-              .width = c(.50, .95)  ) +
-    geom_boxplot(width = 0.2, outlier.alpha=0, size= 0.1, 
-                 position = position_dodge(width  = .8),show.legend = FALSE)+
-    scale_fill_manual(legend_title_result_carbon_disperssion, values = setNames(guide_fill_carbon_disperssion$color_fill,
-                                                                    guide_fill_carbon_disperssion$label_fill) )+
-    guides(fill_ramp = "none")  +
-    scale_y_continuous(limits= limits_axis_y)+
-    labs(x = x_axis_title_result_carbon_disperssion, y = y_axis_title_result_carbon_disperssion)+
-    theme_minimal()+
-    theme(
-      axis.text.y = element_text(angle = 90, hjust = 1),
-          axis.line.y = element_line(color = "black"),
-          axis.line.x = element_line(color = "black"))
+    # Define the colors and labels for the plotting
+     # Define the colors and labels for the plotting
+      
+      guide_fill_carbon_disperssion<- list(
+        data.frame(treatment= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
+        data.frame(treatment= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
+        data.frame(treatment= "treatment_pos", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
+        ) %>% rbind.fill()
+      
+      guide_xaxis_carbon_disperssion<- list(
+        data.frame(level= "t1", label_x= "Forests 2000"),
+        data.frame(level= "t2", label_x= "Forests 2021"),
+        data.frame(level= "loss", label_x = "Forest 2021- Forest 2000")) %>% 
+        rbind.fill()
+      
+      y_axis_title_result_carbon_disperssion<- expression(Tons~of~CO[2]~" by pixel")
+      x_axis_title_result_carbon_disperssion<- "Forest Over Time"
+      legend_title_result_carbon_disperssion<- ""
+      plot_title_result_carbon_disperssion<- paste("Carbon ", type_gov)
+      
+      # Organize data
+      dataplot_carbon_disperssion <- list(dispersion_pre_carbon_effect, 
+                                          dispersion_pos_carbon_effect, 
+                                          dispersion_carbon_effect) %>%
+        rbind.fill() %>% dplyr::mutate(treatment= factor( treatment, levels = unique(.$treatment) )) %>% 
+        list(guide_fill_carbon_disperssion, guide_xaxis_carbon_disperssion) %>% plyr::join_all() %>% 
+        dplyr::mutate(label_x= factor(label_x, unique(guide_xaxis_carbon_disperssion$label_x)),
+                      label_fill= factor(label_fill, unique(guide_fill_carbon_disperssion$label_fill))
+                      )
+      
+      limits_axis_y<- boxplot.stats(dataplot_carbon_disperssion$value)$stats %>% {c(min(.), max(.))}
+      dataplot_carbon_disperssion_t1_t2<- dplyr::filter(dataplot_carbon_disperssion, !level %in% "loss")
+      dataplot_carbon_disperssion_loss<- dplyr::filter(dataplot_carbon_disperssion, level %in% "loss")
+      
+      # plot the disperssion of carbon by pixel between two periods
+      plot_carbon_disperssion_t1_t2<- ggplot(dataplot_carbon_disperssion_t1_t2, aes(x = label_x, y = value, fill= label_fill)) +
+        geom_boxplot(width = 0.2, outlier.alpha=0, size= 0.1, 
+                     position = position_dodge(width  = .8),show.legend = FALSE)+
+        scale_fill_manual(legend_title_result_carbon_disperssion, values = setNames(guide_fill_carbon_disperssion$color_fill,
+                                                                        guide_fill_carbon_disperssion$label_fill) )+
+        guides(fill_ramp = "none")  +
+        scale_y_continuous(limits= limits_axis_y)+
+        labs(x = x_axis_title_result_carbon_disperssion, y = y_axis_title_result_carbon_disperssion)+
+        theme_minimal()+
+        theme(
+          axis.text.y = element_text(angle = 90, hjust = 1),
+              axis.line.y = element_line(color = "black"),
+              axis.line.x = element_line(color = "black"))
 
-  # plot for carbon loss dispersion pixels
-  plot_carbon_disperssion_loss<- ggplot(dataplot_carbon_disperssion_loss, aes(x = label_x, y = value, fill= label_fill)) +
-    stat_slab(side = "right", scale = 0.4,show.legend = T,expand = F, 
-              position = position_dodge(width = .8), aes(fill_ramp = stat(level) ), 
-              .width = c(.50, .95)  ) +
-    geom_boxplot(width = 0.2, outlier.alpha=0, size= 0.1, 
-                 position = position_dodge(width  = .8),show.legend = FALSE)+
-    scale_fill_manual(legend_title_result_carbon_disperssion, values = setNames(guide_fill_carbon_disperssion$color_fill,
-                                                                    guide_fill_carbon_disperssion$label_fill)
-                      )+
-    guides(fill_ramp = "none")  +
-    scale_y_continuous(limits= limits_axis_y)+
-    labs(x = "Carbon loss", y = " ")+
-    theme_minimal()+
-    theme(
-      axis.text.y = element_text(angle = 90, hjust = 1),
-          axis.line.y = element_line(color = "black"),
-          axis.line.x = element_line(color = "black"))
-  
-  
-  # Display the final compiled disperssion carbon plot
-  plot_carbon_final<- ggarrange(plotlist = list(
-                                                plot_carbon,
-                                                plot_loss_carbon_fin,
-                                             plot_carbon_disperssion_t1_t2, 
-                                             plot_carbon_disperssion_loss),
-                                      common.legend = T, legend = "bottom", nrow = 2, ncol=2 )
-```
+      # plot for carbon loss dispersion pixels
+      plot_carbon_disperssion_loss<- ggplot(dataplot_carbon_disperssion_loss, aes(x = label_x, y = value, fill= label_fill)) +
+        geom_boxplot(width = 0.2, outlier.alpha=0, size= 0.1, 
+                     position = position_dodge(width  = .8),show.legend = FALSE)+
+        scale_fill_manual(legend_title_result_carbon_disperssion, values = setNames(guide_fill_carbon_disperssion$color_fill,
+                                                                        guide_fill_carbon_disperssion$label_fill)
+                          )+
+        guides(fill_ramp = "none")  +
+        scale_y_continuous(limits= limits_axis_y)+
+        labs(x = "Carbon loss", y = expression("Delta Time"~ Tons~of~CO[2]~" by pixel") )+
+        theme_minimal()+
+        theme(
+          axis.text.y = element_text(angle = 90, hjust = 1),
+              axis.line.y = element_line(color = "black"),
+              axis.line.x = element_line(color = "black"))
+      
 
-``` r
-print(plot_carbon_final)
-```
+      
+      
+      # Display the final compiled disperssion carbon plot
+      plot_carbon_final<- ggarrange(plotlist = list(
+                                                    plot_carbon,
+                                                    plot_loss_carbon_fin+theme(axis.text.x = element_blank(),axis.title.x = element_blank()),
+                                                 plot_carbon_disperssion_t1_t2, 
+                                                 plot_carbon_disperssion_loss),
+                                          common.legend = T, legend = "bottom", nrow = 2, ncol=2 )
 
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-59-1.png)<!-- -->
+    print(plot_carbon_final)
+
+![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-56-1.png)
 
 # Plotting supplementary information
 
-``` r
-# Load supplementary data
-  file_supplementary<- file.path(input,   "supplementary_data_example.xlsx")
-  file_sheets <- openxlsx::getSheetNames(file_supplementary) 
-  list_supplementary<- lapply(file_sheets, function(x) { openxlsx::read.xlsx(file_supplementary, x) }) %>% setNames(file_sheets)
-  list_supplementary_data<- list_supplementary[!names(list_supplementary) %in% "Area"]
-  
-  data_supplementary<- pblapply(names(list_supplementary_data), function(i){
-    data_gov <- list_supplementary_data[[i]] %>%  melt(id.vars = "Year", variable.name = "Gov_type", value.name = "value") %>% 
-      dplyr::filter(!is.na(value)) %>% dplyr::mutate(Data_type= i)
-  }) %>% plyr::rbind.fill()
-  
-  # Set up graphical parameters for supplementary figures
-  # Base Parameters
-  x_axis_title_supplementary<- "Year"
-  xaxix_angle_supplementary<- 0
-  yaxix_angle_supplementary<- 0
-  legend_title_supplementary<- "Governance\ntype"
-  legend_CO2_supplementary<- c(expression(CO[2]))
-  size_text_supplementary<- 10
-  legend_CO2_type_gov<- c(expression(CO[2]~"loss (%)"))
+    # Load supplementary data
+      file_supplementary<- file.path(input,   "supplementary_data_example.xlsx")
+      file_sheets <- openxlsx::getSheetNames(file_supplementary) 
+      list_supplementary<- lapply(file_sheets, function(x) { openxlsx::read.xlsx(file_supplementary, x) }) %>% setNames(file_sheets)
+      list_supplementary_data<- list_supplementary[!names(list_supplementary) %in% "Area"]
+      
+      data_supplementary<- pblapply(names(list_supplementary_data), function(i){
+        data_gov <- list_supplementary_data[[i]] %>%  melt(id.vars = "Year", variable.name = "Gov_type", value.name = "value") %>% 
+          dplyr::filter(!is.na(value)) %>% dplyr::mutate(Data_type= i)
+      }) %>% plyr::rbind.fill()
+      
+      # Set up graphical parameters for supplementary figures
+      # Base Parameters
+      x_axis_title_supplementary<- "Year"
+      xaxix_angle_supplementary<- 0
+      yaxix_angle_supplementary<- 0
+      legend_title_supplementary<- "Governance\ntype"
+      legend_CO2_supplementary<- c(expression(CO[2]))
+      size_text_supplementary<- 10
+      legend_CO2_type_gov<- c(expression(CO[2]~"loss (%)"))
 
-  
-  #### Specifies custom theme, color and label settings 
-  guide_fill_supplementary <- data.frame(Gov_type= "type_gov", vertical_title= "type_gov", color_fill= "#8D8D8D") %>% 
-    list(dplyr::mutate(list_supplementary$Area)) %>% plyr::join_all() %>% dplyr::mutate(label_fill= paste0(vertical_title, " (", Area, ")"))
-  ylimits_supplementary <- data.frame(Gov_type= "type_gov", vertical_title= "type_gov", color_fill= "#8D8D8D",  ymincol1= NA, ymaxcol1= NA, ymincol2= NA, ymaxcol2= NA, ymincol3= NA, ymaxcol3= NA) %>% 
-    list(guide_fill_supplementary) %>% plyr::join_all()
-  ylimits_type_gov<- ylimits_supplementary
-  
+      
+      #### Specifies custom theme, color and label settings 
+      guide_fill_supplementary <- data.frame(Gov_type= "type_gov", vertical_title= "type_gov", color_fill= "#8D8D8D") %>% 
+        list(dplyr::mutate(list_supplementary$Area)) %>% plyr::join_all() %>% dplyr::mutate(label_fill= paste0(vertical_title, " (", Area, ")"))
+      ylimits_supplementary <- data.frame(Gov_type= "type_gov", vertical_title= "type_gov", color_fill= "#8D8D8D",  ymincol1= NA, ymaxcol1= NA, ymincol2= NA, ymaxcol2= NA, ymincol3= NA, ymaxcol3= NA) %>% 
+        list(guide_fill_supplementary) %>% plyr::join_all()
+      ylimits_type_gov<- ylimits_supplementary
+      
 
-  theme_supplementary<- function() { theme_minimal(base_size= size_text_supplementary) + theme(
-    legend.position = "bottom",
-    axis.ticks.x = element_line(color = "black", size = 0.5),
-    axis.ticks.y = element_line(color = "black", size = 0.5),
-    axis.text.x = element_text(angle = xaxix_angle_supplementary, vjust = 0.5),
-    axis.text.y = element_text(angle = yaxix_angle_supplementary, vjust = 0.5),
-    axis.line.y = element_line(color = "black"),
-    axis.line.x = element_line(color = "black")) }
-  
-  y_axis_titles_supplementary <- list(
-    data.frame(Data_type= "Forest", y_title = 'expression( "Forest Loss (" * km^2*")" )' ),
-    data.frame(Data_type= "ForestProportion", y_title = "Forest Loss (%)" ),
-    data.frame(Data_type= "ForestProportion_from2000", y_title = "Forest Loss\nProportional to 2000 (%)"),
-    data.frame(Data_type= "CarbonTonnes", y_title = 'expression("Tonnes of " ~CO[2]~"emissions")' ),
-    data.frame(Data_type= "CarbonProportion", y_title = 'expression(~CO[2]~"emissions (%)")' ),
-    data.frame(Data_type= "CarbonProportion_from2000", y_title = 'expression(atop(CO[2] ~ "emissions", "proportional to 2000 (%)"))' )
-  ) %>% rbind.fill() 
-  
-  
-  # Organize data for visualization
-  supplementary_dataplot<- data_supplementary %>% 
-    list(guide_fill_supplementary, y_axis_titles_supplementary) %>% plyr::join_all()  %>% 
-    dplyr::mutate(label_fill= factor(label_fill, unique(guide_fill_supplementary$label_fill)),
-                  Gov_type= factor(Gov_type, unique(guide_fill_supplementary$Gov_type)),
-                  Data_type= factor(Data_type, unique(y_axis_titles_supplementary$Data_type))) %>% 
-    dplyr::filter(Year>=2000)   %>% dplyr::filter(!is.na(Gov_type)) %>% dplyr::filter(!is.na(Data_type))
-  
-  
-  type_gov_forest_dataplot<- supplementary_dataplot %>% dplyr::filter(grepl("Forest", Data_type))
-  type_gov_carbon_dataplot<- supplementary_dataplot %>% dplyr::filter(grepl("Carbon", Data_type)) 
-  
-  list_type_gov_forest_dataplot<- type_gov_forest_dataplot %>% split(.$Data_type) %>% {Filter(function(x) nrow(x)>0, .)}
-  list_type_gov_carbon_dataplot<- type_gov_carbon_dataplot %>% split(.$Data_type) %>% {Filter(function(x) nrow(x)>0, .)}
-  
+      theme_supplementary<- function() { theme_minimal(base_size= size_text_supplementary) + theme(
+        legend.position = "bottom",
+        axis.ticks.x = element_line(color = "black", size = 0.5),
+        axis.ticks.y = element_line(color = "black", size = 0.5),
+        axis.text.x = element_text(angle = xaxix_angle_supplementary, vjust = 0.5),
+        axis.text.y = element_text(angle = yaxix_angle_supplementary, vjust = 0.5),
+        axis.line.y = element_line(color = "black"),
+        axis.line.x = element_line(color = "black")) }
+      
+      y_axis_titles_supplementary <- list(
+        data.frame(Data_type= "Forest", y_title = 'expression( "Forest Loss (" * km^2*")" )' ),
+        data.frame(Data_type= "ForestProportion", y_title = "Forest Loss (%)" ),
+        data.frame(Data_type= "ForestProportion_from2000", y_title = "Forest Loss\nProportional to 2000 (%)"),
+        data.frame(Data_type= "CarbonTonnes", y_title = 'expression("Tonnes of " ~CO[2]~"emissions")' ),
+        data.frame(Data_type= "CarbonProportion", y_title = 'expression(~CO[2]~"emissions (%)")' ),
+        data.frame(Data_type= "CarbonProportion_from2000", y_title = 'expression(atop(CO[2] ~ "emissions", "proportional to 2000 (%)"))' )
+      ) %>% rbind.fill() 
+      
+      
+      # Organize data for visualization
+      supplementary_dataplot<- data_supplementary %>% 
+        list(guide_fill_supplementary, y_axis_titles_supplementary) %>% plyr::join_all()  %>% 
+        dplyr::mutate(label_fill= factor(label_fill, unique(guide_fill_supplementary$label_fill)),
+                      Gov_type= factor(Gov_type, unique(guide_fill_supplementary$Gov_type)),
+                      Data_type= factor(Data_type, unique(y_axis_titles_supplementary$Data_type))) %>% 
+        dplyr::filter(Year>=2000)   %>% dplyr::filter(!is.na(Gov_type)) %>% dplyr::filter(!is.na(Data_type))
+      
+      
+      type_gov_forest_dataplot<- supplementary_dataplot %>% dplyr::filter(grepl("Forest", Data_type))
+      type_gov_carbon_dataplot<- supplementary_dataplot %>% dplyr::filter(grepl("Carbon", Data_type)) 
+      
+      list_type_gov_forest_dataplot<- type_gov_forest_dataplot %>% split(.$Data_type) %>% {Filter(function(x) nrow(x)>0, .)}
+      list_type_gov_carbon_dataplot<- type_gov_carbon_dataplot %>% split(.$Data_type) %>% {Filter(function(x) nrow(x)>0, .)}
+      
 
-  
-  #### Generar plot completo
-  list_type_gov_plot<- pblapply(seq_along(list_type_gov_forest_dataplot), function(i){ print(i)
-    
-    
-    grid_forest_dataplot<- list_type_gov_forest_dataplot[[i]]
-    grid_carbon_dataplot<- list_type_gov_carbon_dataplot[[i]]
-    
-    range_grid_forest<- grid_forest_dataplot$value %>% {c(min(.), max(.))}
-    range_grid_carbon<- grid_carbon_dataplot$value %>% {c(min(.), max(.))}
-    
-    grid_carbon_dataplot2<- grid_carbon_dataplot %>% dplyr::mutate(value2= scales::rescale(value, to = range_grid_forest ), Data_type= unique(grid_forest_dataplot$Data_type) )
-    
-    ygrid_lab<- unique(grid_forest_dataplot$y_title)  %>% {tryCatch(eval(parse(text = .)), error=  function(e){.})}
-    ygrid_secondlab<- unique(grid_carbon_dataplot$y_title) %>% {tryCatch(eval(parse(text = .)), error=  function(e){.})}
-    
-    grid_ylimits<- lapply(ylimits_supplementary[, paste0(c("ymincol", "ymaxcol"), i)] %>% split(seq(nrow(.))), function(x) {
-      scale_y_continuous(limits = unlist(x), sec.axis = sec_axis(~ scales::rescale(., from= range_grid_forest, to = range_grid_carbon), name = ygrid_secondlab))  })
-    
-    
-    
+      
+      #### Generar plot completo
+      list_type_gov_plot<- pblapply(seq_along(list_type_gov_forest_dataplot), function(i){ print(i)
+        
+        
+        grid_forest_dataplot<- list_type_gov_forest_dataplot[[i]]
+        grid_carbon_dataplot<- list_type_gov_carbon_dataplot[[i]]
+        
+        range_grid_forest<- grid_forest_dataplot$value %>% {c(min(.), max(.))}
+        range_grid_carbon<- grid_carbon_dataplot$value %>% {c(min(.), max(.))}
+        
+        grid_carbon_dataplot2<- grid_carbon_dataplot %>% dplyr::mutate(value2= scales::rescale(value, to = range_grid_forest ), Data_type= unique(grid_forest_dataplot$Data_type) )
+        
+        ygrid_lab<- unique(grid_forest_dataplot$y_title)  %>% {tryCatch(eval(parse(text = .)), error=  function(e){.})}
+        ygrid_secondlab<- unique(grid_carbon_dataplot$y_title) %>% {tryCatch(eval(parse(text = .)), error=  function(e){.})}
+        
+        grid_ylimits<- lapply(ylimits_supplementary[, paste0(c("ymincol", "ymaxcol"), i)] %>% split(seq(nrow(.))), function(x) {
+          scale_y_continuous(limits = unlist(x), sec.axis = sec_axis(~ scales::rescale(., from= range_grid_forest, to = range_grid_carbon), name = ygrid_secondlab))  })
+        
+        
+        
 
-    grid_plot<- ggplot() +
-      geom_bar(data= grid_forest_dataplot, aes(x = Year, y = value, fill= label_fill),
-               stat = "identity", position = position_dodge2(preserve= "single", width=1), drop= T) +
-      geom_line(data= grid_carbon_dataplot2, aes(x = Year, y = value2, color= "red"), size= 0.5) +
-      geom_point(data= grid_carbon_dataplot2, aes(x = Year, y = value2, color= "red"), size= 0.5)  +
-      scale_color_manual("", labels = legend_CO2_type_gov, values = c("red")) +
-      scale_fill_manual( legend_title_supplementary, drop= F, values = setNames(guide_fill_supplementary$color_fill ,guide_fill_supplementary$label_fill))+
-      guides(fill = guide_legend(order = 1), color = guide_legend(order = 2))+
-      facet_grid2(Gov_type~Data_type, axes = "all", scales = "free",  independent = "all")+
-      ylab(  ygrid_lab    )+ xlab("") +
-      theme_supplementary()+theme(strip.text = element_blank())+
-      ggh4x::facetted_pos_scales(y = grid_ylimits)
-    
-    
-  })
-  
-  
-  list_type_gov_plot[[2]]<- list_type_gov_plot[[2]] + xlab(x_axis_title_supplementary)
-  
-  vertical_titles_type_govplot<-  ggarrange(plotlist = lapply( unique(guide_fill_supplementary$vertical_title) , function(x)
-  {ggplot() +  annotate("text", x = 0, y = 0.1, label = x, angle = 90, vjust = 1, size= 3)+ theme_void() + theme(axis.title.x = element_text())+xlab("")   }), ncol = 1)
-  
-  complete_type_gov_plot<- ggarrange(plotlist = list_type_gov_plot, nrow   = 1,legend=  "bottom", common.legend = T) 
-```
+        grid_plot<- ggplot() +
+          geom_bar(data= grid_forest_dataplot, aes(x = Year, y = value, fill= label_fill),
+                   stat = "identity", position = position_dodge2(preserve= "single", width=1), drop= T) +
+          geom_line(data= grid_carbon_dataplot2, aes(x = Year, y = value2, color= "red"), size= 0.5) +
+          geom_point(data= grid_carbon_dataplot2, aes(x = Year, y = value2, color= "red"), size= 0.5)  +
+          scale_color_manual("", labels = legend_CO2_type_gov, values = c("red")) +
+          scale_fill_manual( legend_title_supplementary, drop= F, values = setNames(guide_fill_supplementary$color_fill ,guide_fill_supplementary$label_fill))+
+          guides(fill = guide_legend(order = 1), color = guide_legend(order = 2))+
+          facet_grid2(Gov_type~Data_type, axes = "all", scales = "free",  independent = "all")+
+          ylab(  ygrid_lab    )+ xlab("") +
+          theme_supplementary()+theme(strip.text = element_blank())+
+          ggh4x::facetted_pos_scales(y = grid_ylimits)
+        
+        
+      })
+      
+      
+      list_type_gov_plot[[2]]<- list_type_gov_plot[[2]] + xlab(x_axis_title_supplementary)
+      
+      vertical_titles_type_govplot<-  ggarrange(plotlist = lapply( unique(guide_fill_supplementary$vertical_title) , function(x)
+      {ggplot() +  annotate("text", x = 0, y = 0.1, label = x, angle = 90, vjust = 1, size= 3)+ theme_void() + theme(axis.title.x = element_text())+xlab("")   }), ncol = 1)
+      
+      complete_type_gov_plot<- ggarrange(plotlist = list_type_gov_plot, nrow   = 1,legend=  "bottom", common.legend = T) 
 
-``` r
-print(complete_type_gov_plot)
-```
+    print(complete_type_gov_plot)
 
-![](RMD-matching-15-04-24-953_files/figure-gfm/unnamed-chunk-61-1.png)<!-- -->
+![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-58-1.png)
