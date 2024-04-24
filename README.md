@@ -46,9 +46,9 @@ Link to the article;
 # Load data
 
     # Load data. The data should be a table where rows correspond to spatial units (e.g., pixels) and columns represent variables.
-    # Each spatial unit (row) will serve as the input for the matching process, which will be performed based on the similarity between covars (columns)
+    # Each spatial unit (row) will serve as the input for the matching process, which will be performed based on the similarity between Covariables (columns)
     setwd(input)
-    data<- read.csv("data.csv", header = T)
+    data<- readRDS("data.rds")
 
     names(data)
 
@@ -118,7 +118,7 @@ Link to the article;
 
     # Evaluate multicollinearity
     formula_test_multicor<- as.formula( paste0(type_gov, "~", paste0(covars, collapse = "+")) )
-    test_multicor<- glm(formula_test_multicor, data = data, family = binomial()) # sort by inflacion de varianza
+    test_multicor<- glm(formula_test_multicor, data = data, family = binomial()) # sort by variance inflation
 
     print(formula_test_multicor)
 
@@ -147,9 +147,9 @@ Link to the article;
     ## Null Deviance:       12280 
     ## Residual Deviance: 8159  AIC: 8207
 
-    # The results of this  model are organized as a correlation matrix, which displays multicollinearity among covariates with respect to the response variable typegov.
+    # The results of this  model are organized as a correlation matrix, which displays multicollinearity among covariates with respect to the response variable type of governance group.
     cordataR<- summary(test_multicor, correlation=T)[["correlation"]] %>% as.data.frame.matrix()
-    cordataR[,"(Intercept)"]<- NULL; cordataR<- cordataR[2:nrow(cordataR), ]# ELIMINAR INTERCEPT MATRIZ DE CORRELACION
+    cordataR[,"(Intercept)"]<- NULL; cordataR<- cordataR[2:nrow(cordataR), ]# Remove intercept from correlation matrix
     NACol<- names(which(rowSums(is.na(cordataR)) > (ncol(cordataR)/2) ))
     cordata<- cordataR %>% {.[!names(.) %in% NACol,]} %>% {.[,!colnames(.) %in% NACol]}; cordata[is.na(cordata)]<-0
 
@@ -247,7 +247,7 @@ Link to the article;
 
     print(ggdendroPlot)
 
-![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-13-1.png)
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-13-1.png)
 
       # Remove high-correlated variables. Following exploration, we select one variable per group to reduce multicollinearity, choosing the variable with the lowest VIF in each group. 
     vif_data<- car::vif(test_multicor) %>% as.data.frame() %>% {data.frame(Var= rownames(.), VIF= .[,1])} %>% arrange(VIF)
@@ -455,17 +455,17 @@ Link to the article;
 
     print(plot_better_model)
 
-![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-27-1.png)
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-27-1.png)
 
 # Pre-matching exploratory analysis
 
 This phase involves analyzing distributions and assessing the balance of
-variables across the typegov groups. It provides an initial diagnostic
+variables across the type of governance group. It provides an initial diagnostic
 of the data, setting the stage for understanding the impact of the
 matching process.
 
       # Propensity scores calculation.
-      # Identifies the 'treated' group based on 'type_gov' == 1, then calculates the standardized differences for selected variables before matching.
+      # Identifies the 'treated' group based on 'type_gov', then calculates the standardized differences for selected variables before matching.
     treated <-(data[,type_gov] ==1) 
     cov <-data[,selected_variables]
     std.diff <-apply(cov,2,function(x) 100*(mean(x[treated])- mean(x[!treated]))/(sqrt(0.5*(var(x[treated]) + var(x[!treated]))))) %>% abs()
@@ -566,7 +566,7 @@ matching process.
 
     print(gg_summ_Imbalancedata)
 
-![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-34-1.png)
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-34-1.png)
 
 # Plotting Imbalance Figure.
 
@@ -625,26 +625,7 @@ after matching through histograms.
 
     print(summ_matching_propension_plot)
 
-![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-36-1.png)
-
-    test_multicor
-
-    ## 
-    ## Call:  glm(formula = formula_test_multicor, family = binomial(), data = data)
-    ## 
-    ## Coefficients:
-    ## (Intercept)   Department   Anual_Prec    Prec_Seas      Dis_Def   Dis_Rivers  
-    ##  -6.929e+00    6.682e-02    1.741e-04    4.758e-02   -5.745e-04   -3.001e-05  
-    ##  District_R   Departme_R   National_R      D7Set10    D7Set1000    D7Set5000  
-    ##  -5.490e-05    3.424e-05   -3.051e-05   -5.634e-05   -2.857e-05   -1.357e-05  
-    ##  D7Set10000     D17Set10   D17Set1000   D17Set5000  D17Set10000   Ecoregions  
-    ##  -1.283e-04   -5.541e-06    5.539e-05   -2.307e-05    1.621e-04   -2.827e-03  
-    ##   Elevation      Pop2000      Pop2020        Slope   Tra_Time00   Tra_Time15  
-    ##   2.292e-04    5.773e-02    6.310e-04   -6.679e-03   -2.982e-04   -1.017e-05  
-    ## 
-    ## Degrees of Freedom: 246113 Total (i.e. Null);  246090 Residual
-    ## Null Deviance:       12280 
-    ## Residual Deviance: 8159  AIC: 8207
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-36-1.png)
 
 # Analysis post-matching
 
@@ -737,13 +718,8 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     sign_form_treatment<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov, "+"), paste(selected_variables, collapse= "+")))
       
-    # Fit a glm to the matched data to evaluate the effect of governance and other covariates on forest status.
-    Model_M_forest = glm( sign_form_treatment , data = y ,family = binomial)
-    Model_M_forest_deviance<- deviance(Model_M_forest)
-    Model_M_forest_AIC<- extractAIC(Model_M_forest)[2]
-    Model_M_forest_sum<- summary(Model_M_forest)
-      
     # Fit a model focused on forest changes from 2000 to 2021 as influenced by governance type alone, simplifying the influence of other variables.
+
     formula_M_forest_2000_2021<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov)))
     Model_M_forest_2000_2021 = glm(formula_M_forest_2000_2021, data = y ,family = binomial)
     Model_M_forest_2000_2021_deviance<- deviance(Model_M_forest_2000_2021)
@@ -751,15 +727,7 @@ pixel in relation to forests and carbon in 2000 and 2021
     Model_M_forest_2000_2021_sum <- summary(Model_M_forest_2000_2021)
     sign_Model_M_forest_2000_2021_sum<- Model_M_forest_2000_2021_sum$coefficients[2,4]
 
-    # Fit a glm to the matched data to evaluate the effect of governance and other covariates on forest status.
-    formula_M_forest_covs<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov, "+"), paste(selected_variables, collapse= "+")))
-    Model_M_forest_covs = glm( formula_M_forest_covs , data = y ,family = binomial)
-    Model_M_forest_covs_deviance<- deviance(Model_M_forest_covs)
-    Model_M_forest_covs_AIC<- extractAIC(Model_M_forest_covs)[2]
-    Model_M_forest_covs_sum<- summary(Model_M_forest_covs)
-    sign_Model_M_forest_covs_sum<- Model_M_forest_covs_sum$coefficients[2,4]
-
-    formula_M_forest_2000_2021; formula_M_forest_covs; 
+    formula_M_forest_2000_2021; 
       
     # Organize forest analysis data
     # This table summarizes forest data for treatment and control groups pre- and post-matching, detailing forest loss, non-loss proportions, their confidence intervals, and statistical significance
@@ -835,10 +803,10 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(plot_forest)
 
-![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-44-1.png)
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-44-1.png)
 
     # Calculate the delta of forest loss for labeling on the plot
-    max_forest_summary<- summary_forest$upper_interval %>%  {max(., na.rm = T)+abs(sd(.))} # valor maximo barra
+    max_forest_summary<- summary_forest$upper_interval %>%  {max(., na.rm = T)+abs(sd(.))} # Maximum value of the bar
     ylimits_forest_summary<- c(0, max_forest_summary)
 
     # plot the proportion of forest loss   with significance annotations
@@ -859,7 +827,7 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(plot_forest_sign)
 
-![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-46-1.png)
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-46-1.png)
 
     ########### Carbon effect
 
@@ -1026,63 +994,25 @@ pixel in relation to forests and carbon in 2000 and 2021
         dplyr::mutate( label_fill= factor(label_fill, unique(guide_fill_carbon$label_fill)),
                        label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x)) )
       
-      # plot the proportion of carbon loss 
-      plot_loss_carbon_fin<- ggplot(data= dataplot_carbon,  aes(x= label_x, y= sum_carbon_prop_loss , fill= label_fill))+
-        geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-        geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                      width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-        xlab(x_axis_title_result_carbon)+ylab(y_axis_title_result_carbon)+
-        scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
-        scale_fill_manual(legend_title_result_carbon,  values = setNames(guide_fill_carbon$color_fill ,guide_fill_carbon$label_fill) )+
-        theme_minimal()+
-        theme(legend.position = "bottom",
-              axis.text.x  = element_blank(),
-              axis.line.y = element_line(color = "black"),
-              axis.line.x = element_line(color = "black"))
-
-    print(plot_loss_carbon_fin)
-
-![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-50-1.png)
 
     ## Plotting carbon and forest estimations summary plot
       # Define the colors and labels for the plotting
       y_secondaxis_carbon_summary<- c(expression(CO[2]~"emissions (%)"))
       legend_label_carbon_summary<- c(expression(CO[2]~"emissions (%)")) # etiqueta de carbon en leyenda
-      color_bar_carbon_summary<- "red" # ancho de barra carbon
-      alpha_bar_carbon_summary<- 0.5 # transparencia barra carbon
-      size_bar_carbon_summary<- 1 # grosor de barra carbon
-      height_bar_carbon_summary<- 1 # altura de barra carbon
-      size_point_carbon_summary<- 3 # grosor de barra carbon
-      
+      color_bar_carbon_summary<- "red"
+      alpha_bar_carbon_summary<- 0.5 
+      size_bar_carbon_summary<- 1 
+      height_bar_carbon_summary<- 1 
+      size_point_carbon_summary<- 3 
       
       # Organize and Prepare Data for Combined Carbon and Forest Plot
       dataplot_carbon_bars<-   summary_carbon %>% 
-        list(guide_xaxis_forest, guide_fill_forest) %>% join_all() %>% 
-        dplyr::mutate(
-          label_fill= factor(label_fill, unique(guide_fill_forest$label_fill)),
-          label_x= factor(label_x, levels= unique(guide_xaxis_forest$label_x))) %>% 
-        dplyr::select(label_x, sum_carbon_prop_loss, label_fill, sum_carbon_prop_loss ) %>% dplyr::distinct() %>% 
-        group_by(label_x) %>% dplyr::mutate(n_level= n_distinct(label_fill), numeric_level= as.numeric(label_x) ) %>% as.data.frame()
-      
-
-      # Calculate Percentage Change in Forest Loss (Delta)
-      delta_summary_forest<- {
-        data_delta<-  dataplot_forest %>% dplyr::filter(!fd %in% "control_pre")
-        denominador<- max( data_delta$forest_prop_loss )
-        numerador<- min( data_delta$forest_prop_loss )
-        delta <- (1-(numerador / denominador)) *100
-        type<- data_delta %>% split(.$label_fill)
-        sentido<- ifelse(  type$Treatment$forest_prop_loss >= type$`Control posMatching`$forest_prop_loss, "red", "darkgreen" )
-        data.frame(label_x= type_gov, delta= delta, color= sentido)
-      }
-      
-    # Annotation for Delta in Forest Loss on the Forest Summary Plot
-      forest_summary_sign_plot<-  plot_forest_sign + 
-        geom_text(x=2.5, y= y_pos, label= paste0(round(delta_summary_forest$delta, 0), "%"), size= 4, vjust= -2.5, color= delta_summary_forest$color)
-
-    print(forest_summary_sign_plot)
-
-![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-52-1.png)
+      list(guide_xaxis_forest, guide_fill_forest) %>% join_all() %>% 
+      dplyr::mutate(
+      label_fill= factor(label_fill, unique(guide_fill_forest$label_fill)),
+      label_x= factor(label_x, levels= unique(guide_xaxis_forest$label_x))) %>% 
+      dplyr::select(label_x, sum_carbon_prop_loss, label_fill, sum_carbon_prop_loss ) %>% dplyr::distinct() %>% 
+      group_by(label_x) %>% dplyr::mutate(n_level= n_distinct(label_fill), numeric_level= as.numeric(label_x) ) %>% as.data.frame()
 
      # Create Combined Plot for Carbon Emissions and Forest Loss
       forest_carbon_summary_sign_plot<-   plot_forest_sign+ ggnewscale::new_scale_fill()+
@@ -1100,7 +1030,7 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(forest_carbon_summary_sign_plot)
 
-![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-54-1.png)
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-54-1.png)
 
 # Plotting carbon disperssion estimations
 
@@ -1136,8 +1066,7 @@ pixel in relation to forests and carbon in 2000 and 2021
       
       limits_axis_y<- boxplot.stats(dataplot_carbon_disperssion$value)$stats %>% {c(min(.), max(.))}
       dataplot_carbon_disperssion_t1_t2<- dplyr::filter(dataplot_carbon_disperssion, !level %in% "loss")
-      dataplot_carbon_disperssion_loss<- dplyr::filter(dataplot_carbon_disperssion, level %in% "loss")
-      
+
       # plot the disperssion of carbon by pixel between two periods
       plot_carbon_disperssion_t1_t2<- ggplot(dataplot_carbon_disperssion_t1_t2, aes(x = label_x, y = value, fill= label_fill)) +
         geom_boxplot(width = 0.2, outlier.alpha=0, size= 0.1, 
@@ -1152,37 +1081,10 @@ pixel in relation to forests and carbon in 2000 and 2021
           axis.text.y = element_text(angle = 90, hjust = 1),
               axis.line.y = element_line(color = "black"),
               axis.line.x = element_line(color = "black"))
+    
+    print(plot_carbon_disperssion_t1_t2)
 
-      # plot for carbon loss dispersion pixels
-      plot_carbon_disperssion_loss<- ggplot(dataplot_carbon_disperssion_loss, aes(x = label_x, y = value, fill= label_fill)) +
-        geom_boxplot(width = 0.2, outlier.alpha=0, size= 0.1, 
-                     position = position_dodge(width  = .8),show.legend = FALSE)+
-        scale_fill_manual(legend_title_result_carbon_disperssion, values = setNames(guide_fill_carbon_disperssion$color_fill,
-                                                                        guide_fill_carbon_disperssion$label_fill)
-                          )+
-        guides(fill_ramp = "none")  +
-        scale_y_continuous(limits= limits_axis_y)+
-        labs(x = "Carbon loss", y = expression("Delta Time"~ Tons~of~CO[2]~" by pixel") )+
-        theme_minimal()+
-        theme(
-          axis.text.y = element_text(angle = 90, hjust = 1),
-              axis.line.y = element_line(color = "black"),
-              axis.line.x = element_line(color = "black"))
-      
-
-      
-      
-      # Display the final compiled disperssion carbon plot
-      plot_carbon_final<- ggarrange(plotlist = list(
-                                                    plot_carbon,
-                                                    plot_loss_carbon_fin+theme(axis.text.x = element_blank(),axis.title.x = element_blank()),
-                                                 plot_carbon_disperssion_t1_t2, 
-                                                 plot_carbon_disperssion_loss),
-                                          common.legend = T, legend = "bottom", nrow = 2, ncol=2 )
-
-    print(plot_carbon_final)
-
-![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-56-1.png)
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-56-1.png)
 
 # Plotting supplementary information
 
@@ -1299,4 +1201,4 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(complete_type_gov_plot)
 
-![](RMD-matching-15-04-24-8-_-24_files/figure-markdown_strict/unnamed-chunk-58-1.png)
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-58-1.png)

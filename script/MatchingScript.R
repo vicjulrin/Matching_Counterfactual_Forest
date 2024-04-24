@@ -22,9 +22,9 @@ output<- file.path(dirname(dir_work), "output")
 # Load data ####
 
 # Load data. The data should be a table where rows correspond to spatial units (e.g., pixels) and columns represent variables.
-# Each spatial unit (row) will serve as the input for the matching process, which will be performed based on the similarity between covars (columns)
+# Each spatial unit (row) will serve as the input for the matching process, which will be performed based on the similarity between Covariables (columns)
 setwd(input)
-data<- readRDS("data2.rds")
+data<- readRDS("data.rds")
 
 
 names(data)
@@ -49,18 +49,16 @@ covars<-c( "Department", "Anual_Prec", "Prec_Seas",  "Dis_Def",    "Dis_Rivers",
 
 # test multicolinearity ####
   
-# Evaluate multicollinearity: It can distort interpretations by inflating the variance of regression coefficients of variables
-# For matching analysis, we use the glm typegov ~ covar1 + covar2 + covar3 with a binomial distribution to model the probability of governance based on covariates. This formula can also be used to assess multicollinearity, demonstrating how covariate interactions contribute to variance inflation in relation to typegov by mean of the same glm test.
-
+# Evaluate multicollinearity
 formula_test_multicor<- as.formula( paste0(type_gov, "~", paste0(covars, collapse = "+")) )
-test_multicor<- glm(formula_test_multicor, data = data, family = binomial()) # sort by inflacion de varianza
+test_multicor<- glm(formula_test_multicor, data = data, family = binomial()) # sort by variance inflation
 
 print(formula_test_multicor)
 test_multicor
 
-# The results of this  model are organized as a correlation matrix, which displays multicollinearity among covariates with respect to the response variable typegov.
+# The results of this  model are organized as a correlation matrix, which displays multicollinearity among covariates with respect to the response variable type of governance group.
 cordataR<- summary(test_multicor, correlation=T)[["correlation"]] %>% as.data.frame.matrix()
-cordataR[,"(Intercept)"]<- NULL; cordataR<- cordataR[2:nrow(cordataR), ]# ELIMINAR INTERCEPT MATRIZ DE CORRELACION
+cordataR[,"(Intercept)"]<- NULL; cordataR<- cordataR[2:nrow(cordataR), ]# Remove intercept from correlation matrix
 NACol<- names(which(rowSums(is.na(cordataR)) > (ncol(cordataR)/2) ))
 cordata<- cordataR %>% {.[!names(.) %in% NACol,]} %>% {.[,!colnames(.) %in% NACol]}; cordata[is.na(cordata)]<-0
 
@@ -172,7 +170,7 @@ plot_better_model
   
   
 # Pre-matching exploratory analysis. ####
-# This phase involves analyzing distributions and assessing the balance of variables across the typegov groups. It provides an initial diagnostic of the data, setting the stage for understanding the impact of the matching process. 
+# This phase involves analyzing distributions and assessing the balance of variables across the type of governance group. It provides an initial diagnostic of the data, setting the stage for understanding the impact of the matching process. 
 
 
 # Propensity scores calculation. Propensity scores estimate the probability of treatment assignment based on observed covariates
@@ -430,15 +428,7 @@ Model_M_forest_2000_2021_AIC<- extractAIC(Model_M_forest_2000_2021)[2]
 Model_M_forest_2000_2021_sum <- summary(Model_M_forest_2000_2021)
 sign_Model_M_forest_2000_2021_sum<- Model_M_forest_2000_2021_sum$coefficients[2,4]
 
-# Fit a glm to the matched data to evaluate the effect of governance and other covariates on forest status.
-formula_M_forest_covs<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov, "+"), paste(selected_variables, collapse= "+")))
-Model_M_forest_covs = glm( formula_M_forest_covs , data = y ,family = binomial)
-Model_M_forest_covs_deviance<- deviance(Model_M_forest_covs)
-Model_M_forest_covs_AIC<- extractAIC(Model_M_forest_covs)[2]
-Model_M_forest_covs_sum<- summary(Model_M_forest_covs)
-sign_Model_M_forest_covs_sum<- Model_M_forest_covs_sum$coefficients[2,4]
-
-formula_M_forest_2000_2021; formula_M_forest_covs; 
+formula_M_forest_2000_2021; 
   
 # Organize forest analysis data
 # This table summarizes forest data for treatment and control groups pre- and post-matching, detailing forest loss, non-loss proportions, their confidence intervals, and statistical significance
@@ -504,7 +494,7 @@ plot_forest<- ggplot(data= dataplot_forest,  aes(x= label_x, y= forest_prop_loss
 y_pos<- max(dataplot_forest$upper_interval)+1;
 
 # Calculate the delta of forest loss for labeling on the plot
-max_forest_summary<- summary_forest$upper_interval %>%  {max(., na.rm = T)+abs(sd(.))} # valor maximo barra
+max_forest_summary<- summary_forest$upper_interval %>%  {max(., na.rm = T)+abs(sd(.))} # Maximum value of the bar
 ylimits_forest_summary<- c(0, max_forest_summary)
 
 # plot the signicances of analyusis of proportion of forest loss 
@@ -658,95 +648,26 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
     data.frame(fd= "treatment", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
   ) %>% rbind.fill()
   
-
-  
   guide_xaxis_carbon <- list(
     data.frame(level= "mean_carbon_t1", label_x= "Forests 2000"),
     data.frame(level= "mean_carbon_t2", label_x= "Forests 2021")
   ) %>% rbind.fill()
-  
   
   y_axis_title_result_carbon<- c(expression(CO[2]~"emissions (%)"))
   x_axis_title_result_carbon<- type_gov
   legend_title_result_carbon<- ""
   plot_title_result_carbon<- paste("Carbon", type_gov)
   
-
-  data_plot_carbon<-   melt(data.table(summary_carbon)[,c("fd", "mean_carbon_t1", "mean_carbon_t2")], 
-                            id.vars = "fd", variable.name = "level", 
-                            value.name = "value") %>% 
-    list(guide_xaxis_carbon, guide_fill_carbon) %>% join_all() %>% 
-    dplyr::mutate(
-      label_fill= factor(label_fill, unique(guide_fill_carbon$label_fill)),
-      label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x))
-    )
   
-
-  # plot the proportion of carbon loss 
-  y_axis_title_result_carbon_mean<- "Mean Carbon loss by pixel"
-
-  plot_carbon<-  ggplot()+geom_bar(data= data_plot_carbon,  aes(x= label_x , y= value*100 , fill= label_fill), stat = "identity",
-                                  width = 0.4, size= 0.1, position = position_dodge(width  = .8) ) +
-    xlab("")+ylab(y_axis_title_result_carbon_mean)+
-    scale_fill_manual("", values = setNames(guide_fill_carbon$color_fill , guide_fill_carbon$label_fill) )  +
-    theme_minimal()+
-    theme(
-      axis.text.x = element_blank(),
-      axis.title.x = element_blank(),
-      axis.text.y = element_text(angle = 90, hjust = 1),
-      axis.line.y = element_line(color = "black"),
-      axis.line.x = element_line(color = "black"))
-  
-  
-  plot_loss_carbon_fin<- ggplot(data= dataplot_carbon,  aes(x= label_x, y= sum_carbon_prop_loss , fill= label_fill))+
-    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                  width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-    xlab(x_axis_title_result_carbon)+ylab(y_axis_title_result_carbon)+
-    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
-    scale_fill_manual(legend_title_result_carbon,  values = setNames(guide_fill_carbon$color_fill ,guide_fill_carbon$label_fill) )+
-    theme_minimal()+
-    theme(legend.position = "bottom",
-          axis.text.x  = element_blank(),
-          axis.line.y = element_line(color = "black"),
-          axis.line.x = element_line(color = "black"))
-  
-  # plot the proportion of carbon loss  with significance annotations
-  plot_loss_carbon_sign <- ggplot(data= dataplot_carbon,  aes(x= label_x, y= sum_carbon_prop_loss , fill= label_fill))+
-    geom_bar(stat = "identity", width = 0.4, size= 0.1, position = position_dodge(width  = .8)) +
-    geom_errorbar(aes(ymin = low_interval, ymax = upper_interval),
-                  width = 0.1, position =  position_dodge(width  = .8), color = "black")+
-    geom_signif(position="identity",  textsize = 5, comparisons=list(c("Control posMatching","Treatment")) ,annotations = dataplot_carbon$sign_forest_2000_2021[1])+
-    xlab(x_axis_title_result_carbon)+ylab(y_axis_title_result_carbon)+
-    scale_y_continuous(limits = c(0,100), labels = function(x) paste0(x, "%")) +
-    scale_fill_manual(legend_title_result_carbon,  values = setNames(guide_fill_carbon$color_fill ,guide_fill_carbon$label_fill) )+
-    theme_minimal()+
-    theme(legend.position = "bottom",
-          axis.text.x  = element_blank(),
-          axis.line.y = element_line(color = "black"),
-          axis.line.x = element_line(color = "black"))
-  
-  plot_loss_carbon_sign
-  
-  
-  # Arrange the forest and carbon loss plots into a single figure
-  plot_response_sign <- ggpubr::ggarrange(
-    plotlist = list(plot_forest_sign, plot_loss_carbon_sign),  # List of plots to arrange
-    common.legend = TRUE,  # Use a single common legend for all plots
-    legend = "bottom"  # Position the legend at the bottom of the arranged figure
-  )
-  
-  
-  
-## Plotting carbon and forest estimations summary plot
+  ## Plotting carbon and forest estimations summary plot
   # Define the colors and labels for the plotting
   y_secondaxis_carbon_summary<- c(expression(CO[2]~"emissions (%)"))
   legend_label_carbon_summary<- c(expression(CO[2]~"emissions (%)")) # etiqueta de carbon en leyenda
-  color_bar_carbon_summary<- "red" # ancho de barra carbon
-  alpha_bar_carbon_summary<- 0.5 # transparencia barra carbon
-  size_bar_carbon_summary<- 1 # grosor de barra carbon
-  height_bar_carbon_summary<- 1 # altura de barra carbon
-  size_point_carbon_summary<- 3 # grosor de barra carbon
+  color_bar_carbon_summary<- "red"
+  alpha_bar_carbon_summary<- 0.5
+  size_bar_carbon_summary<- 1
+  height_bar_carbon_summary<- 1
+  size_point_carbon_summary<- 3
   
   
   # Organize and Prepare Data for Combined Carbon and Forest Plot
@@ -758,13 +679,13 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
     dplyr::select(label_x, sum_carbon_prop_loss, label_fill, sum_carbon_prop_loss ) %>% dplyr::distinct() %>% 
     group_by(label_x) %>% dplyr::mutate(n_level= n_distinct(label_fill), numeric_level= as.numeric(label_x) ) %>% as.data.frame()
   
-
+  
   # Calculate Percentage Change in Forest Loss (Delta)
   delta_summary_forest<- {
     data_delta<-  dataplot_forest %>% dplyr::filter(!fd %in% "control_pre")
     denominador<- max( data_delta$forest_prop_loss )
     numerador<- min( data_delta$forest_prop_loss )
-
+    
     delta <- (1-(numerador / denominador)) *100
     type<- data_delta %>% split(.$label_fill)
     sentido<- ifelse(  type$Treatment$forest_prop_loss >= type$`Control posMatching`$forest_prop_loss, "red", "darkgreen" )
@@ -789,12 +710,14 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
     scale_color_manual("", labels = legend_label_carbon_summary, values =  color_bar_carbon_summary )  +
     scale_y_continuous(sec.axis = sec_axis(~., name = y_secondaxis_carbon_summary ), limits = ylimits_forest_summary )+
     annotate(geom="text", x= 2.5, y= y_pos, label= paste0(round(delta_summary_forest$delta, 0), "%"), size= 4, vjust= -2.5, color= delta_summary_forest$color)
-  forest_carbon_summary_sign_plot
+ 
+   forest_carbon_summary_sign_plot
+  
+  
   
   
 ##  Plotting carbon disperssion estimations
   # Define the colors and labels for the plotting
-  
   guide_fill_carbon_disperssion<- list(
     data.frame(treatment= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
     data.frame(treatment= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
@@ -824,8 +747,7 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
   
   limits_axis_y<- boxplot.stats(dataplot_carbon_disperssion$value)$stats %>% {c(min(.), max(.))}
   dataplot_carbon_disperssion_t1_t2<- dplyr::filter(dataplot_carbon_disperssion, !level %in% "loss")
-  dataplot_carbon_disperssion_loss<- dplyr::filter(dataplot_carbon_disperssion, level %in% "loss")
-  
+
   # plot the disperssion of carbon by pixel between two periods
   plot_carbon_disperssion_t1_t2<- ggplot(dataplot_carbon_disperssion_t1_t2, aes(x = label_x, y = value, fill= label_fill)) +
     geom_boxplot(width = 0.2, outlier.alpha=0, size= 0.1, 
@@ -841,34 +763,13 @@ loss_pos_carbon<- dplyr::filter(matched.cases_forest, forest_yC2000 == 1 & fores
           axis.line.y = element_line(color = "black"),
           axis.line.x = element_line(color = "black"))
 
-  # plot for carbon loss dispersion pixels
-  plot_carbon_disperssion_loss<- ggplot(dataplot_carbon_disperssion_loss, aes(x = label_x, y = value, fill= label_fill)) +
-    geom_boxplot(width = 0.2, outlier.alpha=0, size= 0.1, 
-                 position = position_dodge(width  = .8),show.legend = FALSE)+
-    scale_fill_manual(legend_title_result_carbon_disperssion, values = setNames(guide_fill_carbon_disperssion$color_fill,
-                                                                    guide_fill_carbon_disperssion$label_fill)
-                      )+
-    guides(fill_ramp = "none")  +
-    scale_y_continuous(limits= limits_axis_y)+
-    labs(x = "Carbon loss", y = expression("Delta Time"~ Tons~of~CO[2]~" by pixel") )+
-    theme_minimal()+
-    theme(
-      axis.text.y = element_text(angle = 90, hjust = 1),
-          axis.line.y = element_line(color = "black"),
-          axis.line.x = element_line(color = "black"))
-  
+
 
   
   
   # Display the final compiled disperssion carbon plot
-  plot_carbon_final<- ggarrange(plotlist = list(
-                                                plot_carbon,
-                                                plot_loss_carbon_fin+theme(axis.text.x = element_blank(),axis.title.x = element_blank()),
-                                             plot_carbon_disperssion_t1_t2, 
-                                             plot_carbon_disperssion_loss),
-                                      common.legend = T, legend = "bottom", nrow = 2, ncol=2 )
+  plot_carbon_disperssion_t1_t2
 
-  plot_carbon_final
   
   ##  Plotting supplementary information
   
