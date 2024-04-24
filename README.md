@@ -58,7 +58,7 @@ Link to the article;
     ## [16] "D7Set10000"   "D17Set10"     "D17Set1000"   "D17Set5000"   "D17Set10000" 
     ## [21] "Ecoregions"   "Elevation"    "Pop2000"      "Pop2020"      "Slope"       
     ## [26] "Tra_Time00"   "Tra_Time15"   "Fores_2000"   "Fores_2005"   "Fores_2010"  
-    ## [31] "Fores_2021"   "Carbon_pixel" "id_rincon"    "PA"           "IL"          
+    ## [31] "Fores_2021"   "Carbon_pixel"      "PA"           "IL"          
     ## [36] "CC"           "LC"           "MC"           "psvalue"
 
     head(data)
@@ -91,7 +91,7 @@ Link to the article;
     ## 200 0.0307703 0.0363957  49.6271        639        607          1          1
     ## 209 0.0449926 0.0193342 120.7510        205        707          1          1
     ## 215 0.0378849 0.0231144  37.7905        462        508          1          1
-    ##     Fores_2010 Fores_2021 Carbon_pixel id_rincon PA IL CC LC MC     psvalue
+    ##     Fores_2010 Fores_2021 Carbon_pixel PA IL CC LC MC     psvalue
     ## 178          1          1    4.7597309       178 NA NA NA NA  1 0.004631550
     ## 183          1          1    2.1390750       183 NA NA NA NA  1 0.008777402
     ## 193          1          1    3.3981211       193 NA NA NA NA  1 0.008442159
