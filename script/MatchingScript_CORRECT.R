@@ -19,6 +19,8 @@ input<- file.path(dirname(dir_work), "input")
 output<- file.path(dirname(dir_work), "output")
 
 
+save.image("C:/Users/victor.rincon/Documents/test_mc.RData")
+
 # Load data ####
 
 # Load data. The data should be a table where rows correspond to spatial units (e.g., pixels) and columns represent variables.

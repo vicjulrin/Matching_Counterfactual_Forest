@@ -46,7 +46,7 @@ Link to the article;
 # Load data
 
     # Load data. The data should be a table where rows correspond to spatial units (e.g., pixels) and columns represent variables.
-    # Each spatial unit (row) will serve as the input for the matching process, which will be performed based on the similarity between Covariables (columns)
+    # Each spatial unit (row) will serve as the input for the matching process, which will be performed based on the similarity between covariables (columns)
     setwd(input)
     data<- readRDS("data.rds")
 
@@ -58,8 +58,8 @@ Link to the article;
     ## [16] "D7Set10000"   "D17Set10"     "D17Set1000"   "D17Set5000"   "D17Set10000" 
     ## [21] "Ecoregions"   "Elevation"    "Pop2000"      "Pop2020"      "Slope"       
     ## [26] "Tra_Time00"   "Tra_Time15"   "Fores_2000"   "Fores_2005"   "Fores_2010"  
-    ## [31] "Fores_2021"   "Carbon_pixel"      "PA"           "IL"          
-    ## [36] "CC"           "LC"           "MC"           "psvalue"
+    ## [31] "Fores_2021"   "Carbon_pixel" "PA"           "IL"           "CC"          
+    ## [36] "LC"           "MC"           "psvalue"
 
     head(data)
 
@@ -92,16 +92,17 @@ Link to the article;
     ## 209 0.0449926 0.0193342 120.7510        205        707          1          1
     ## 215 0.0378849 0.0231144  37.7905        462        508          1          1
     ##     Fores_2010 Fores_2021 Carbon_pixel PA IL CC LC MC     psvalue
-    ## 178          1          1    4.7597309       178 NA NA NA NA  1 0.004631550
-    ## 183          1          1    2.1390750       183 NA NA NA NA  1 0.008777402
-    ## 193          1          1    3.3981211       193 NA NA NA NA  1 0.008442159
-    ## 200          1          1    4.9245031       200 NA NA NA NA  1 0.005549685
-    ## 209          1          1    0.5354883       209 NA NA NA NA  1 0.009464278
-    ## 215          1          1    4.7747252       215 NA NA NA NA  1 0.008541629
+    ## 178          1          1    4.7597309 NA NA NA NA  1 0.004631550
+    ## 183          1          1    2.1390750 NA NA NA NA  1 0.008777402
+    ## 193          1          1    3.3981211 NA NA NA NA  1 0.008442159
+    ## 200          1          1    4.9245031 NA NA NA NA  1 0.005549685
+    ## 209          1          1    0.5354883 NA NA NA NA  1 0.009464278
+    ## 215          1          1    4.7747252 NA NA NA NA  1 0.008541629
 
     # Specify the column name in data that defines spatial units in relation to governance type. 
     # This column indicates which spatial units are associated with a type of governance (1) and which are not (0).
     type_gov<- "MC"
+    data<- data[!is.na(data[,type_gov]),]
     table(data[,type_gov])
 
     ## 
@@ -147,9 +148,10 @@ Link to the article;
     ## Null Deviance:       12280 
     ## Residual Deviance: 8159  AIC: 8207
 
-    # The results of this  model are organized as a correlation matrix, which displays multicollinearity among covariates with respect to the response variable type of governance group.
+    # The results of this  model are organized as a correlation matrix, which displays multicollinearity among covariates with respect to the response variable typegov.
     cordataR<- summary(test_multicor, correlation=T)[["correlation"]] %>% as.data.frame.matrix()
-    cordataR[,"(Intercept)"]<- NULL; cordataR<- cordataR[2:nrow(cordataR), ]# Remove intercept from correlation matrix
+    cordataR[,"(Intercept)"]<- NULL; cordataR<- cordataR[2:nrow(cordataR), ]# ELIMINATE INTERCEPT CORRELATION MATRIX
+
     NACol<- names(which(rowSums(is.na(cordataR)) > (ncol(cordataR)/2) ))
     cordata<- cordataR %>% {.[!names(.) %in% NACol,]} %>% {.[,!colnames(.) %in% NACol]}; cordata[is.na(cordata)]<-0
 
@@ -460,12 +462,12 @@ Link to the article;
 # Pre-matching exploratory analysis
 
 This phase involves analyzing distributions and assessing the balance of
-variables across the type of governance group. It provides an initial diagnostic
-of the data, setting the stage for understanding the impact of the
-matching process.
+variables across the type of governance groups. It provides an initial
+diagnostic of the data, setting the stage for understanding the impact
+of the matching process.
 
       # Propensity scores calculation.
-      # Identifies the 'treated' group based on 'type_gov', then calculates the standardized differences for selected variables before matching.
+      # Identifies the 'treated' group based on type of governance, then calculates the standardized differences for selected variables before matching.
     treated <-(data[,type_gov] ==1) 
     cov <-data[,selected_variables]
     std.diff <-apply(cov,2,function(x) 100*(mean(x[treated])- mean(x[!treated]))/(sqrt(0.5*(var(x[treated]) + var(x[!treated]))))) %>% abs()
@@ -714,12 +716,7 @@ pixel in relation to forests and carbon in 2000 and 2021
 
 # Estimation of treatment significance - governance type
 
-    # Model to assess changes in forest status from 2000 to 2021 as a function of governance type and selected variables.
-
-    sign_form_treatment<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov, "+"), paste(selected_variables, collapse= "+")))
-      
     # Fit a model focused on forest changes from 2000 to 2021 as influenced by governance type alone, simplifying the influence of other variables.
-
     formula_M_forest_2000_2021<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov)))
     Model_M_forest_2000_2021 = glm(formula_M_forest_2000_2021, data = y ,family = binomial)
     Model_M_forest_2000_2021_deviance<- deviance(Model_M_forest_2000_2021)
@@ -728,7 +725,7 @@ pixel in relation to forests and carbon in 2000 and 2021
     sign_Model_M_forest_2000_2021_sum<- Model_M_forest_2000_2021_sum$coefficients[2,4]
 
     formula_M_forest_2000_2021; 
-      
+
     # Organize forest analysis data
     # This table summarizes forest data for treatment and control groups pre- and post-matching, detailing forest loss, non-loss proportions, their confidence intervals, and statistical significance
     summary_forest<- data.frame(fd= c("treatment", "control_pre", "control_pos"),
@@ -806,7 +803,8 @@ pixel in relation to forests and carbon in 2000 and 2021
 ![](RMD-figures/figure-markdown_strict/unnamed-chunk-44-1.png)
 
     # Calculate the delta of forest loss for labeling on the plot
-    max_forest_summary<- summary_forest$upper_interval %>%  {max(., na.rm = T)+abs(sd(.))} # Maximum value of the bar
+    max_forest_summary<- summary_forest$upper_interval %>%  {max(., na.rm = T)+abs(sd(.))} # maximum value bar
+
     ylimits_forest_summary<- c(0, max_forest_summary)
 
     # plot the proportion of forest loss   with significance annotations
@@ -969,50 +967,45 @@ pixel in relation to forests and carbon in 2000 and 2021
     ## 2      15.513425
     ## 3       2.995097
 
-    # Plotting carbon estimations
-      # Define the colors and labels for the plotting
-      guide_fill_carbon<- list(
-        data.frame(fd= "control_pre", label_fill= "Control preMatching", color_fill= "lightskyblue1"),
-        data.frame(fd= "control_pos", label_fill = "Control posMatching", color_fill= "rosybrown1"),
-        data.frame(fd= "treatment", label_fill = "Treatment", color_fill = "lightgoldenrodyellow")
-      ) %>% rbind.fill()
-      
-      guide_xaxis_carbon <- list(
-        data.frame(fd= "control_pre", label_x= "Control preMatching"),
-        data.frame(fd= "control_pos", label_x= "Control posMatching"),
-        data.frame(fd= "treatment", label_x = "Treatment")
-      ) %>% rbind.fill()
-      
-      y_axis_title_result_carbon<- c(expression(CO[2]~"emissions (%)"))
-      x_axis_title_result_carbon<- type_gov
-      legend_title_result_carbon<- ""
-      plot_title_result_carbon<- paste("Carbon", type_gov)
-      
-      dataplot_carbon<- summary_carbon %>%
-        dplyr::mutate(fd= factor( fd, levels = unique(.$fd) )) %>% 
-        list(guide_fill_carbon, guide_xaxis_carbon) %>% plyr::join_all() %>% 
-        dplyr::mutate( label_fill= factor(label_fill, unique(guide_fill_carbon$label_fill)),
-                       label_x= factor(label_x, levels= unique(guide_xaxis_carbon$label_x)) )
-      
-
     ## Plotting carbon and forest estimations summary plot
       # Define the colors and labels for the plotting
       y_secondaxis_carbon_summary<- c(expression(CO[2]~"emissions (%)"))
-      legend_label_carbon_summary<- c(expression(CO[2]~"emissions (%)")) # etiqueta de carbon en leyenda
-      color_bar_carbon_summary<- "red"
-      alpha_bar_carbon_summary<- 0.5 
-      size_bar_carbon_summary<- 1 
-      height_bar_carbon_summary<- 1 
-      size_point_carbon_summary<- 3 
+      legend_label_carbon_summary<- c(expression(CO[2]~"emissions (%)")) # carbon label in legend
+      color_bar_carbon_summary<- "red" # carbon bar color
+      alpha_bar_carbon_summary<- 0.5 # carbon bar transparency
+      size_bar_carbon_summary<- 1 # carbon bar width
+      height_bar_carbon_summary<- 1 # carbon bar height
+      size_point_carbon_summary<- 3 # carbon point size
+      
       
       # Organize and Prepare Data for Combined Carbon and Forest Plot
       dataplot_carbon_bars<-   summary_carbon %>% 
-      list(guide_xaxis_forest, guide_fill_forest) %>% join_all() %>% 
-      dplyr::mutate(
-      label_fill= factor(label_fill, unique(guide_fill_forest$label_fill)),
-      label_x= factor(label_x, levels= unique(guide_xaxis_forest$label_x))) %>% 
-      dplyr::select(label_x, sum_carbon_prop_loss, label_fill, sum_carbon_prop_loss ) %>% dplyr::distinct() %>% 
-      group_by(label_x) %>% dplyr::mutate(n_level= n_distinct(label_fill), numeric_level= as.numeric(label_x) ) %>% as.data.frame()
+        list(guide_xaxis_forest, guide_fill_forest) %>% join_all() %>% 
+        dplyr::mutate(
+          label_fill= factor(label_fill, unique(guide_fill_forest$label_fill)),
+          label_x= factor(label_x, levels= unique(guide_xaxis_forest$label_x))) %>% 
+        dplyr::select(label_x, sum_carbon_prop_loss, label_fill, sum_carbon_prop_loss ) %>% dplyr::distinct() %>% 
+        group_by(label_x) %>% dplyr::mutate(n_level= n_distinct(label_fill), numeric_level= as.numeric(label_x) ) %>% as.data.frame()
+      
+
+      # Calculate Percentage Change in Forest Loss (Delta)
+      delta_summary_forest<- {
+        data_delta<-  dataplot_forest %>% dplyr::filter(!fd %in% "control_pre")
+        denominador<- max( data_delta$forest_prop_loss )
+        numerador<- min( data_delta$forest_prop_loss )
+        delta <- (1-(numerador / denominador)) *100
+        type<- data_delta %>% split(.$label_fill)
+        sentido<- ifelse(  type$Treatment$forest_prop_loss >= type$`Control posMatching`$forest_prop_loss, "red", "darkgreen" )
+        data.frame(label_x= type_gov, delta= delta, color= sentido)
+      }
+      
+    # Annotation for Delta in Forest Loss on the Forest Summary Plot
+      forest_summary_sign_plot<-  plot_forest_sign + 
+        geom_text(x=2.5, y= y_pos, label= paste0(round(delta_summary_forest$delta, 0), "%"), size= 4, vjust= -2.5, color= delta_summary_forest$color)
+
+    print(forest_summary_sign_plot)
+
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-50-1.png)
 
      # Create Combined Plot for Carbon Emissions and Forest Loss
       forest_carbon_summary_sign_plot<-   plot_forest_sign+ ggnewscale::new_scale_fill()+
@@ -1030,7 +1023,7 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(forest_carbon_summary_sign_plot)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-54-1.png)
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-52-1.png)
 
 # Plotting carbon disperssion estimations
 
@@ -1065,8 +1058,10 @@ pixel in relation to forests and carbon in 2000 and 2021
                       )
       
       limits_axis_y<- boxplot.stats(dataplot_carbon_disperssion$value)$stats %>% {c(min(.), max(.))}
+      
       dataplot_carbon_disperssion_t1_t2<- dplyr::filter(dataplot_carbon_disperssion, !level %in% "loss")
-
+      dataplot_carbon_disperssion_loss<- dplyr::filter(dataplot_carbon_disperssion, level %in% "loss")
+      
       # plot the disperssion of carbon by pixel between two periods
       plot_carbon_disperssion_t1_t2<- ggplot(dataplot_carbon_disperssion_t1_t2, aes(x = label_x, y = value, fill= label_fill)) +
         geom_boxplot(width = 0.2, outlier.alpha=0, size= 0.1, 
@@ -1081,10 +1076,10 @@ pixel in relation to forests and carbon in 2000 and 2021
           axis.text.y = element_text(angle = 90, hjust = 1),
               axis.line.y = element_line(color = "black"),
               axis.line.x = element_line(color = "black"))
-    
+
     print(plot_carbon_disperssion_t1_t2)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-56-1.png)
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-54-1.png)
 
 # Plotting supplementary information
 
@@ -1201,4 +1196,4 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(complete_type_gov_plot)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-58-1.png)
+![](RMD-figures/figure-markdown_strict/unnamed-chunk-56-1.png)
