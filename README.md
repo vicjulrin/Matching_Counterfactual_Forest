@@ -716,7 +716,6 @@ pixel in relation to forests and carbon in 2000 and 2021
 
 # Estimation of treatment significance - governance type
 
-    # Fit a model focused on forest changes from 2000 to 2021 as influenced by governance type alone, simplifying the influence of other variables.
     formula_M_forest_2000_2021<- as.formula(paste0("cbind(Fores_2000,Fores_2021)", paste0("~", type_gov)))
     Model_M_forest_2000_2021 = glm(formula_M_forest_2000_2021, data = y ,family = binomial)
     Model_M_forest_2000_2021_deviance<- deviance(Model_M_forest_2000_2021)
