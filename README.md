@@ -249,7 +249,7 @@ Link to the article;
 
     print(ggdendroPlot)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-13-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-13-1.png)
 
       # Remove high-correlated variables. Following exploration, we select one variable per group to reduce multicollinearity, choosing the variable with the lowest VIF in each group. 
     vif_data<- car::vif(test_multicor) %>% as.data.frame() %>% {data.frame(Var= rownames(.), VIF= .[,1])} %>% arrange(VIF)
@@ -457,7 +457,7 @@ Link to the article;
 
     print(plot_better_model)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-27-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-27-1.png)
 
 # Pre-matching exploratory analysis
 
@@ -568,7 +568,7 @@ of the matching process.
 
     print(gg_summ_Imbalancedata)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-34-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-34-1.png)
 
 # Plotting Imbalance Figure.
 
@@ -627,7 +627,7 @@ after matching through histograms.
 
     print(summ_matching_propension_plot)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-36-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-36-1.png)
 
 # Analysis post-matching
 
@@ -800,7 +800,7 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(plot_forest)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-44-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-44-1.png)
 
     # Calculate the delta of forest loss for labeling on the plot
     max_forest_summary<- summary_forest$upper_interval %>%  {max(., na.rm = T)+abs(sd(.))} # maximum value bar
@@ -825,7 +825,7 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(plot_forest_sign)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-46-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-46-1.png)
 
     ########### Carbon effect
 
@@ -1005,7 +1005,7 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(forest_summary_sign_plot)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-50-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-50-1.png)
 
      # Create Combined Plot for Carbon Emissions and Forest Loss
       forest_carbon_summary_sign_plot<-   plot_forest_sign+ ggnewscale::new_scale_fill()+
@@ -1023,7 +1023,7 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(forest_carbon_summary_sign_plot)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-52-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-52-1.png)
 
 # Plotting carbon disperssion estimations
 
@@ -1079,7 +1079,7 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(plot_carbon_disperssion_t1_t2)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-54-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-54-1.png)
 
 # Plotting supplementary information
 
@@ -1196,4 +1196,4 @@ pixel in relation to forests and carbon in 2000 and 2021
 
     print(complete_type_gov_plot)
 
-![](RMD-figures/figure-markdown_strict/unnamed-chunk-56-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-56-1.png)
