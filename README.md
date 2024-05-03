@@ -7,8 +7,8 @@ effectiveness of protected areas and potential OECMs, particularly
 Indigenous Lands and Non-Timber Forest Products Concessions, preventing
 forest loss in the Peruvian Amazon from 2000 to 2021. It uses a robust
 before-after control intervention design with statistical matching to
-account for the non-random distribution of deforestation pressure and
-governance types.
+account for the non-random distribution of deforestation pressure and of
+the different governance mechanisms.
 
 The input of the script is a data table where the rows represent pixels
 and the columns represent covariates. You must include a column that
