@@ -3,11 +3,12 @@ governance mechanisms on forest loss and its associated carbon emissions
 in the Peruvian Amazon from 2000 to 2021 done for the article “Potential
 of different governance mechanisms for achieving Global Biodiversity
 Framework goals” (Negret et al. 2024). The study evaluates the
-effectiveness of protected areas (PAs) and potential OECMs, particularly
-Indigenous Lands and Non-Timber Forest Products Concessions, in the
-Peruvian Amazon from 2000 to 2021. It uses a robust before-after control
-intervention design with statistical matching to account for non-random
-deforestation pressures and governance types.
+effectiveness of protected areas and potential OECMs, particularly
+Indigenous Lands and Non-Timber Forest Products Concessions, preventing
+forest loss in the Peruvian Amazon from 2000 to 2021. It uses a robust
+before-after control intervention design with statistical matching to
+account for the non-random distribution of deforestation pressure and
+governance types.
 
 The input of the script is a data table where the rows represent pixels
 and the columns represent covariates. You must include a column that

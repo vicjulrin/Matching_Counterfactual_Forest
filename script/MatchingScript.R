@@ -691,7 +691,7 @@ forest_carbon_summary_sign_plot<-   plot_forest_sign+ ggnewscale::new_scale_fill
   annotate(geom="text", x= 2.5, y= y_pos, label= paste0(round(delta_summary_forest$delta, 0), "%"), size= 4, vjust= -2.5, color= delta_summary_forest$color)
 
 
-
+delta_summary_forest
 print(forest_carbon_summary_sign_plot)
 
 
